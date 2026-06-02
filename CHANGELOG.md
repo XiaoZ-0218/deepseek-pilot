@@ -2,6 +2,14 @@
 
 All notable changes to **DeepSeek Pilot** are recorded here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-06-02
+
+Adds a full Chinese (Simplified) interface. The extension now follows VS Code's display language: set it to Chinese and the commands, settings, Manage Provider menu, dialogs, notifications, and getting-started walkthrough appear in Chinese; English stays the default everywhere else.
+
+### Added
+
+- **Chinese (`zh-cn`) localization** of the entire user-facing surface — the 13 commands, every setting description, the Manage Provider quick-pick, the API-key and reasoning-cache dialogs, error notifications, the streaming "thinking" hint, and the four walkthrough steps. Built on VS Code's manifest NLS (`package.nls.json` / `package.nls.zh-cn.json`) and the `vscode.l10n` runtime bundle (`l10n/bundle.l10n.json` / `l10n/bundle.l10n.zh-cn.json`); no new dependencies, and English is unchanged. Original translation contributed by [@XiaoZ-0218](https://github.com/XiaoZ-0218) ([#1](https://github.com/setsey/deepseek-pilot/pull/1)).
+
 ## [0.2.2] — 2026-05-25
 
 ### Changed
