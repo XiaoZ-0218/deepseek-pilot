@@ -19,11 +19,11 @@ export class AuthManager {
   async promptForApiKey(): Promise<boolean> {
     const existing = await this.context.secrets.get(SECRET_KEY);
     const key = await vscode.window.showInputBox({
-      title: 'DeepSeek API Key',
-      prompt: 'Paste your DeepSeek API key or compatible proxy bearer token',
+      title: vscode.l10n.t('DeepSeek API Key'),
+      prompt: vscode.l10n.t('Paste your DeepSeek API key or compatible proxy bearer token'),
       password: true,
       value: existing,
-      placeHolder: 'sk-... or your proxy token',
+      placeHolder: vscode.l10n.t('sk-... or your proxy token'),
       ignoreFocusOut: true,
     });
 
@@ -31,26 +31,26 @@ export class AuthManager {
 
     const trimmed = key.trim();
     if (!trimmed) {
-      vscode.window.showWarningMessage('API key is required.');
+      vscode.window.showWarningMessage(vscode.l10n.t('API key is required.'));
       return false;
     }
 
     const failureReason = await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: 'Validating DeepSeek API key…',
+        title: vscode.l10n.t('Validating DeepSeek API key…'),
       },
       async () => validateApiKey(trimmed),
     );
 
     if (failureReason !== null) {
       const choice = await vscode.window.showWarningMessage(
-        `API key validation failed: ${failureReason}`,
+        vscode.l10n.t('API key validation failed: {0}', failureReason),
         { modal: false },
-        'Save anyway',
-        'Cancel',
+        vscode.l10n.t('Save anyway'),
+        vscode.l10n.t('Cancel'),
       );
-      if (choice !== 'Save anyway') {
+      if (choice !== vscode.l10n.t('Save anyway')) {
         return false;
       }
     }
@@ -58,8 +58,8 @@ export class AuthManager {
     await this.context.secrets.store(SECRET_KEY, trimmed);
     vscode.window.showInformationMessage(
       failureReason === null
-        ? 'DeepSeek API key validated and saved.'
-        : 'DeepSeek API key saved without successful validation.',
+        ? vscode.l10n.t('DeepSeek API key validated and saved.')
+        : vscode.l10n.t('DeepSeek API key saved without successful validation.'),
     );
     return true;
   }
