@@ -19,11 +19,11 @@ export class AuthManager {
   async promptForApiKey(): Promise<boolean> {
     const existing = await this.context.secrets.get(SECRET_KEY);
     const key = await vscode.window.showInputBox({
-      title: vscode.l10n.t('deepseek-pilot.auth.title'),
-      prompt: vscode.l10n.t('deepseek-pilot.auth.prompt'),
+      title: vscode.l10n.t('DeepSeek API Key'),
+      prompt: vscode.l10n.t('Paste your DeepSeek API key or compatible proxy bearer token'),
       password: true,
       value: existing,
-      placeHolder: vscode.l10n.t('deepseek-pilot.auth.placeholder'),
+      placeHolder: vscode.l10n.t('sk-... or your proxy token'),
       ignoreFocusOut: true,
     });
 
@@ -31,26 +31,26 @@ export class AuthManager {
 
     const trimmed = key.trim();
     if (!trimmed) {
-      vscode.window.showWarningMessage(vscode.l10n.t('deepseek-pilot.auth.required'));
+      vscode.window.showWarningMessage(vscode.l10n.t('API key is required.'));
       return false;
     }
 
     const failureReason = await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: vscode.l10n.t('deepseek-pilot.auth.validating'),
+        title: vscode.l10n.t('Validating DeepSeek API key…'),
       },
       async () => validateApiKey(trimmed),
     );
 
     if (failureReason !== null) {
       const choice = await vscode.window.showWarningMessage(
-        vscode.l10n.t('deepseek-pilot.auth.failed', failureReason),
+        vscode.l10n.t('API key validation failed: {0}', failureReason),
         { modal: false },
-        vscode.l10n.t('deepseek-pilot.auth.saveAnyway'),
-        vscode.l10n.t('deepseek-pilot.auth.cancel'),
+        vscode.l10n.t('Save anyway'),
+        vscode.l10n.t('Cancel'),
       );
-      if (choice !== vscode.l10n.t('deepseek-pilot.auth.saveAnyway')) {
+      if (choice !== vscode.l10n.t('Save anyway')) {
         return false;
       }
     }
@@ -58,8 +58,8 @@ export class AuthManager {
     await this.context.secrets.store(SECRET_KEY, trimmed);
     vscode.window.showInformationMessage(
       failureReason === null
-        ? vscode.l10n.t('deepseek-pilot.auth.saved')
-        : vscode.l10n.t('deepseek-pilot.auth.savedNoValidation'),
+        ? vscode.l10n.t('DeepSeek API key validated and saved.')
+        : vscode.l10n.t('DeepSeek API key saved without successful validation.'),
     );
     return true;
   }

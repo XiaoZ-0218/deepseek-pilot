@@ -37,9 +37,9 @@ export async function setCopilotUtilityModel(
   const picked = await vscode.window.showQuickPick(items, {
     title:
       slot === 'small'
-        ? vscode.l10n.t('deepseek-pilot.utility.title.small')
-        : vscode.l10n.t('deepseek-pilot.utility.title.primary'),
-    placeHolder: vscode.l10n.t('deepseek-pilot.utility.placeholder', recommendedId),
+        ? vscode.l10n.t('Set Copilot Utility Small Model (used for fast, lightweight flows)')
+        : vscode.l10n.t('Set Copilot Utility Model (used for titles, summaries, commits, intent)'),
+    placeHolder: vscode.l10n.t('Recommended: {0}', recommendedId),
     matchOnDescription: true,
     matchOnDetail: true,
   });
@@ -60,10 +60,10 @@ export async function setCopilotUtilityModel(
       .update(targetSetting, value, vscode.ConfigurationTarget.Global);
     logger.info(`Set ${targetSetting}=${value}`);
     void vscode.window.showInformationMessage(
-      vscode.l10n.t('deepseek-pilot.utility.setTo', slot === 'small' ? 'Utility Small' : 'Utility', picked.label),
-      vscode.l10n.t('deepseek-pilot.utility.openSetting'),
+      vscode.l10n.t('{0} model set to {1}.', slot === 'small' ? 'Utility Small' : 'Utility', picked.label),
+      vscode.l10n.t('Open Setting'),
     ).then((choice) => {
-      if (choice === vscode.l10n.t('deepseek-pilot.utility.openSetting')) {
+      if (choice === vscode.l10n.t('Open Setting')) {
         void vscode.commands.executeCommand(
           'workbench.action.openSettings',
           `@id:${targetSetting}`,
@@ -73,7 +73,7 @@ export async function setCopilotUtilityModel(
   } catch (e) {
     logger.error(`Failed to set ${targetSetting}`, e);
     void vscode.window.showErrorMessage(
-      vscode.l10n.t('deepseek-pilot.utility.failed', e instanceof Error ? e.message : String(e)),
+      vscode.l10n.t('Failed to set Copilot utility model: {0}', e instanceof Error ? e.message : String(e)),
     );
   }
 }

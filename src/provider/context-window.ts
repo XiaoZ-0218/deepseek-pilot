@@ -166,14 +166,14 @@ export class ContextWindowTracker {
     const snap = this.snapshot();
     if (!snap.turn) {
       void vscode.window.showInformationMessage(
-        vscode.l10n.t('deepseek-pilot.context.noTurns'),
+        vscode.l10n.t('DeepSeek context window: no turns recorded yet. Send a message first.'),
       );
       return;
     }
 
     const turn = snap.turn;
     const md = [
-      vscode.l10n.t('deepseek-pilot.context.detailsTitle', turn.modelName),
+      vscode.l10n.t('**DeepSeek Context Window** — {0}', turn.modelName),
       '',
       `**Last turn:** ${turn.promptTokens.toLocaleString()} / ${turn.maxInputTokens.toLocaleString()} prompt tokens (**${snap.pctUsed.toFixed(1)}%** of window)`,
       `**Cache hit:** ${turn.cacheHitTokens.toLocaleString()} hit + ${turn.cacheMissTokens.toLocaleString()} miss = **${snap.cacheHitPct.toFixed(0)}%** hit rate`,

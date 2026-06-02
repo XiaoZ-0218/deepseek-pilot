@@ -111,7 +111,7 @@ export async function migrateFromDeepseekQa(context: vscode.ExtensionContext): P
 
   if (migratedSomething) {
     void vscode.window.showInformationMessage(
-      vscode.l10n.t('deepseek-pilot.migrate.complete'),
+      vscode.l10n.t('DeepSeek Pilot: migrated your existing API key and settings from the previous extension namespace. Old entries cleaned up.'),
     );
   }
 }

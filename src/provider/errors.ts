@@ -34,37 +34,37 @@ export function formatApiError(status: number, statusText: string, body: string)
 export async function notifyApiError(status: number, summary: string): Promise<void> {
   if (status === 401) {
     const choice = await vscode.window.showErrorMessage(
-      vscode.l10n.t('deepseek-pilot.error.401', summary),
-      vscode.l10n.t('deepseek-pilot.error.updateApiKey'),
+      vscode.l10n.t('DeepSeek API key was rejected (401). {0}', summary),
+      vscode.l10n.t('Update API Key'),
     );
-    if (choice === vscode.l10n.t('deepseek-pilot.error.updateApiKey')) {
+    if (choice === vscode.l10n.t('Update API Key')) {
       void vscode.commands.executeCommand('deepseek-pilot.setApiKey');
     }
     return;
   }
   if (status === 402) {
     const choice = await vscode.window.showErrorMessage(
-      vscode.l10n.t('deepseek-pilot.error.402', summary),
-      vscode.l10n.t('deepseek-pilot.error.openBilling'),
+      vscode.l10n.t('DeepSeek account has insufficient balance (402). {0}', summary),
+      vscode.l10n.t('Open DeepSeek Billing'),
     );
-    if (choice === vscode.l10n.t('deepseek-pilot.error.openBilling')) {
+    if (choice === vscode.l10n.t('Open DeepSeek Billing')) {
       void vscode.env.openExternal(vscode.Uri.parse('https://platform.deepseek.com/usage'));
     }
     return;
   }
   if (status === 422) {
     const choice = await vscode.window.showErrorMessage(
-      vscode.l10n.t('deepseek-pilot.error.422', summary),
-      vscode.l10n.t('deepseek-pilot.error.reloadWindow'),
+      vscode.l10n.t('DeepSeek rejected the request schema (422). Likely a host/extension mismatch. {0}', summary),
+      vscode.l10n.t('Reload Window'),
     );
-    if (choice === vscode.l10n.t('deepseek-pilot.error.reloadWindow')) {
+    if (choice === vscode.l10n.t('Reload Window')) {
       void vscode.commands.executeCommand('workbench.action.reloadWindow');
     }
     return;
   }
   if (status === 429) {
     void vscode.window.showWarningMessage(
-      vscode.l10n.t('deepseek-pilot.error.429'),
+      vscode.l10n.t('DeepSeek rate limited (429). The extension already retried — try again in a moment.'),
     );
     return;
   }
@@ -78,13 +78,13 @@ export async function notifyApiError(status: number, summary: string): Promise<v
       lower.includes("role 'tool'")
     ) {
       const choice = await vscode.window.showErrorMessage(
-        vscode.l10n.t('deepseek-pilot.error.400', summary),
-        vscode.l10n.t('deepseek-pilot.error.startNewChat'),
-        vscode.l10n.t('deepseek-pilot.error.showLogs'),
+        vscode.l10n.t('DeepSeek rejected the request (400). {0}', summary),
+        vscode.l10n.t('Start New Chat'),
+        vscode.l10n.t('Show Logs'),
       );
-      if (choice === vscode.l10n.t('deepseek-pilot.error.startNewChat')) {
+      if (choice === vscode.l10n.t('Start New Chat')) {
         void vscode.commands.executeCommand('workbench.action.chat.newChat');
-      } else if (choice === vscode.l10n.t('deepseek-pilot.error.showLogs')) {
+      } else if (choice === vscode.l10n.t('Show Logs')) {
         void vscode.commands.executeCommand('deepseek-pilot.showLogs');
       }
       return;
@@ -95,7 +95,7 @@ export async function notifyApiError(status: number, summary: string): Promise<v
   // knows it's a server-side problem, not a misconfiguration.
   if (status === 500 || status === 503) {
     void vscode.window.showWarningMessage(
-      vscode.l10n.t('deepseek-pilot.error.500', String(status)),
+      vscode.l10n.t('DeepSeek server is having trouble ({0}). The extension already retried — please retry in a moment.', String(status)),
     );
     return;
   }
