@@ -2,6 +2,11 @@
 
 All notable changes to **DeepSeek Pilot** are recorded here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] — 2026-06-18
+
+### Changed
+- Removed the hard `extensionDependencies` on `github.copilot-chat`, which could block Remote-SSH / WSL / Dev-Container sessions from activating the extension. GitHub Copilot Chat is still required — install it from the Marketplace if you don't already have it (the walkthrough and README cover this); it is simply no longer pulled in as an auto-installed dependency.
+
 ## [0.4.1] — 2026-06-18
 
 ### Documentation
