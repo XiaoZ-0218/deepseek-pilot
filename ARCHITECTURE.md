@@ -68,17 +68,25 @@ However, `convert.ts` and `validate.ts` DO use `instanceof` because they're call
 - `convert.ts` enforces DeepSeek invariants: tool messages must follow matching assistant tool_calls
 - Orphan tool results (no matching open tool_call_id) are dropped with a warning, not sent to API
 - `sanitize.ts` strips unsupported JSON Schema keywords (anyOf/oneOf/allOf) and fixes non-conforming function names
+- **Tool-name round-trip:** names are sanitized to DeepSeek's charset before sending (`request.ts` builds a sanitized→original `toolNameMap` on `PreparedRequest`). The model echoes the sanitized name, but the host routes tool calls by the *original* name, so `stream.ts` translates back via the map when emitting the `LanguageModelToolCallPart`. The reasoning-cache fingerprint deliberately keys on the sanitized (wire) name on both the write side (`stream.ts`) and the read side (`convert.ts` re-sanitizes the historical name) so multi-turn cache hits survive. No-op for already-valid names.
+- `LanguageModelChatToolMode.Required` maps to a named `tool_choice` for a single tool and the `"required"` literal for several (DeepSeek supports both)
+
+### Request Classification (utility flows)
+
+Copilot Chat fires many small auxiliary requests against the active model — chat titles, commit messages, branch names, rename suggestions, prompt categorization. `request-kind.ts` detects these by their distinctive system-prompt fragments (and the absence of tools — the real agentic loop always passes tools). When a `(thinking)` variant is the active model and such a flow is detected, `request.ts` forces `thinking: { type: 'disabled' }` so reasoning tokens aren't burned on trivial work. Gated to the official base URL (a proxy may map models differently) and to the `deepseek-pilot.optimizeUtilityRequests` setting (default on, so it's killable). It logs `[req] utility flow detected …` whenever it fires, so a false positive is visible in the output channel. The marker list is heuristic — Copilot's internal prompts aren't a public contract — but a miss only costs a few wasted tokens and a false positive only ever drops reasoning from a Copilot helper flow (which doesn't need it). Mirrors the same optimization in both upstream prior-art projects.
 
 ## Model Variants
 
 | ID | maxInputTokens | maxOutputTokens | Thinking |
 | --- | --- | --- | --- |
-| `deepseek-v4-pro::thinking` | 720,896 | 262,144 | yes |
-| `deepseek-v4-pro` | 917,504 | 65,536 | no |
-| `deepseek-v4-flash::thinking` | 720,896 | 262,144 | yes |
-| `deepseek-v4-flash` | 917,504 | 65,536 | no |
+| `deepseek-v4-pro::thinking` | 655,360 | 393,216 | yes |
+| `deepseek-v4-pro` | 983,040 | 65,536 | no |
+| `deepseek-v4-flash::thinking` | 655,360 | 393,216 | yes |
+| `deepseek-v4-flash` | 983,040 | 65,536 | no |
 
-All four variants share `category: { label: 'DeepSeek V4' }` so they appear under one collapsible row in the model picker. Each declares `capabilities: { imageInput: true, toolCalling: 128 }` (128 = `MAX_TOOLS_PER_REQUEST` in [consts.ts](src/consts.ts) — matches the DeepSeek API cap). Thinking variants additionally expose a `configurationSchema` for the per-model "Thinking Effort" picker (`high` / `max`).
+DeepSeek V4 exposes a **1M-token shared window** (input + output ≤ 1,048,576) with a 384K max-output ceiling, per [the pricing page](https://api-docs.deepseek.com/quick_start/pricing). The thinking variants reserve the full 393,216-token output so a long reasoning chain can't be silently truncated (leaving 655,360 input); the non-thinking variants reserve 64K and keep 983,040 for input. Both API models are `deepseek-v4-pro` / `deepseek-v4-flash` (sent via `getApiModelId`); the legacy `deepseek-chat` / `deepseek-reasoner` IDs retire 2026-07-24, so the V4 IDs are the forward-correct choice.
+
+All four variants share `category: { label: 'DeepSeek V4' }` so they appear under one collapsible row in the model picker. Each declares `capabilities: { imageInput: true, toolCalling: 128 }` (128 = `MAX_TOOLS_PER_REQUEST` in [consts.ts](src/consts.ts) — matches the DeepSeek API cap). Thinking variants additionally expose a `configurationSchema` for the per-model "Thinking Effort" picker (`high` / `max`). Each also carries non-public `inputCost` / `outputCost` / `cacheCost` strings (from `priceFields` in [consts.ts](src/consts.ts)) so DeepSeek's prices render in Copilot's native cost slots; hosts that don't read them ignore them, and the `detail` string carries the same numbers as a visible fallback.
 
 ## Build & Package
 

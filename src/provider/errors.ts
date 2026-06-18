@@ -25,6 +25,30 @@ export function formatApiError(status: number, statusText: string, body: string)
 }
 
 /**
+ * Turn a low-level fetch/network failure into a readable, actionable line.
+ * Node's `fetch` surfaces these as `TypeError: fetch failed` with the real
+ * reason in `.cause` (a `code` like ENOTFOUND / ECONNREFUSED / ETIMEDOUT, or a
+ * TLS error). When we recognise a code we point at the likely cause; otherwise
+ * we pass the underlying message through unchanged (so HTTP/timeout errors
+ * formatted elsewhere are not double-wrapped).
+ */
+export function formatNetworkError(error: unknown): string {
+  const err = error as {
+    message?: string;
+    code?: string;
+    cause?: { code?: string; message?: string };
+  };
+  const code = err?.code ?? err?.cause?.code;
+  if (!code) {
+    return err?.cause?.message ?? err?.message ?? String(error);
+  }
+  return vscode.l10n.t(
+    'Could not reach DeepSeek ({0}). Check your network connection, any VPN/proxy, and the `deepseek-pilot.baseUrl` setting.',
+    code,
+  );
+}
+
+/**
  * Surface actionable buttons for the common 4xx errors. Fire-and-forget —
  * the underlying error still throws. We only show actionable popups for
  * conditions the user can do something about: 401 (key), 402 (billing),
@@ -54,7 +78,10 @@ export async function notifyApiError(status: number, summary: string): Promise<v
   }
   if (status === 422) {
     const choice = await vscode.window.showErrorMessage(
-      vscode.l10n.t('DeepSeek rejected the request schema (422). Likely a host/extension mismatch. {0}', summary),
+      vscode.l10n.t(
+        'DeepSeek rejected the request schema (422). Likely a host/extension mismatch. {0}',
+        summary,
+      ),
       vscode.l10n.t('Reload Window'),
     );
     if (choice === vscode.l10n.t('Reload Window')) {
@@ -64,7 +91,9 @@ export async function notifyApiError(status: number, summary: string): Promise<v
   }
   if (status === 429) {
     void vscode.window.showWarningMessage(
-      vscode.l10n.t('DeepSeek rate limited (429). The extension already retried — try again in a moment.'),
+      vscode.l10n.t(
+        'DeepSeek rate limited (429). The extension already retried — try again in a moment.',
+      ),
     );
     return;
   }
@@ -95,7 +124,10 @@ export async function notifyApiError(status: number, summary: string): Promise<v
   // knows it's a server-side problem, not a misconfiguration.
   if (status === 500 || status === 503) {
     void vscode.window.showWarningMessage(
-      vscode.l10n.t('DeepSeek server is having trouble ({0}). The extension already retried — please retry in a moment.', String(status)),
+      vscode.l10n.t(
+        'DeepSeek server is having trouble ({0}). The extension already retried — please retry in a moment.',
+        String(status),
+      ),
     );
     return;
   }
@@ -111,7 +143,11 @@ export async function fetchWithRetry(
   init: RequestInit,
   signal: AbortSignal,
   attempts = 3,
-  timeoutMs = 300_000, // 5 min per attempt
+  // 10 min per attempt. The signal also guards the streamed body read, so this
+  // must outlast a long max-effort reasoning stream; DeepSeek itself closes a
+  // connection only after 10 min without inference progress, so we match that
+  // ceiling rather than truncating a slow-but-healthy response at 5 min.
+  timeoutMs = 600_000,
 ): Promise<Response> {
   let lastErr: unknown;
   for (let i = 0; i < attempts; i += 1) {
@@ -126,9 +162,7 @@ export async function fetchWithRetry(
         return res;
       }
       lastErr = new Error(`HTTP ${res.status} ${res.statusText}`);
-      logger.warn(
-        `retry attempt=${i + 1} status=${res.status} willRetry=${i < attempts - 1}`,
-      );
+      logger.warn(`retry attempt=${i + 1} status=${res.status} willRetry=${i < attempts - 1}`);
       try {
         await res.text();
       } catch {
@@ -151,5 +185,5 @@ export async function fetchWithRetry(
       await new Promise((r) => setTimeout(r, delayMs));
     }
   }
-  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+  throw new Error(formatNetworkError(lastErr));
 }

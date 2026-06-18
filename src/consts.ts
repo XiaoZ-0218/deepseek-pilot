@@ -20,19 +20,42 @@ export const USAGE_MIME_TYPE = 'usage';
 export const MAX_TOOLS_PER_REQUEST = 128;
 
 /**
- * Per-million-token regular pricing (USD) — published 2026-04 by
- * https://api-docs.deepseek.com/quick_start/pricing. Pricing.ts is the
- * source of truth for cost computation; this snapshot is only for surfacing
- * a short "$/Mtok in:out" hint inside the model picker's `detail` field.
+ * Per-million-token pricing (USD) for the model-picker `detail` hint and the
+ * native cost fields only — `input` is the cache-miss rate, `output` the
+ * completion rate. These mirror the cache-miss/output columns of the PRICING
+ * table in balance.ts (the source of truth for cost computation). Current as
+ * of DeepSeek V4 (https://api-docs.deepseek.com/quick_start/pricing): Pro
+ * $0.435/$0.87, Flash $0.14/$0.28 per Mtok. Pro's permanent 75%-off rate is
+ * already baked in here — the earlier $1.74/$3.48 figure was the pre-discount
+ * price and made the picker overstate Pro's cost 4x.
  */
 const PRICE_USD = {
-  pro: { input: 1.74, output: 3.48 },
-  flash: { input: 0.14, output: 0.28 },
+  pro: { input: 0.435, output: 0.87, cacheHit: 0.003625 },
+  flash: { input: 0.14, output: 0.28, cacheHit: 0.0028 },
 } as const;
 
 function priceHint(family: 'pro' | 'flash'): string {
   const p = PRICE_USD[family];
   return `$${p.input}/$${p.output} per Mtok in/out`;
+}
+
+/**
+ * Per-Mtok cost strings for the (non-public) native cost fields Copilot Chat
+ * renders in the model picker. Best-effort: hosts that don't recognise the
+ * fields ignore them, and the `detail` string carries the same numbers as a
+ * fallback. `cacheCost` is the cache-hit input rate.
+ */
+export function priceFields(family: 'deepseek-v4-pro' | 'deepseek-v4-flash'): {
+  inputCost: string;
+  outputCost: string;
+  cacheCost: string;
+} {
+  const p = PRICE_USD[family === 'deepseek-v4-flash' ? 'flash' : 'pro'];
+  return {
+    inputCost: `$${p.input}`,
+    outputCost: `$${p.output}`,
+    cacheCost: `$${p.cacheHit}`,
+  };
 }
 
 export const MODELS = [
@@ -44,8 +67,8 @@ export const MODELS = [
     vendor: 'deepseek-pilot',
     family: 'deepseek-v4-pro',
     version: 'thinking',
-    maxInputTokens: 720896,
-    maxOutputTokens: 262144,
+    maxInputTokens: 655360,
+    maxOutputTokens: 393216,
     thinking: true,
   },
   {
@@ -56,7 +79,7 @@ export const MODELS = [
     vendor: 'deepseek-pilot',
     family: 'deepseek-v4-pro',
     version: 'default',
-    maxInputTokens: 917504,
+    maxInputTokens: 983040,
     maxOutputTokens: 65536,
     thinking: false,
   },
@@ -68,8 +91,8 @@ export const MODELS = [
     vendor: 'deepseek-pilot',
     family: 'deepseek-v4-flash',
     version: 'thinking',
-    maxInputTokens: 720896,
-    maxOutputTokens: 262144,
+    maxInputTokens: 655360,
+    maxOutputTokens: 393216,
     thinking: true,
   },
   {
@@ -80,7 +103,7 @@ export const MODELS = [
     vendor: 'deepseek-pilot',
     family: 'deepseek-v4-flash',
     version: 'default',
-    maxInputTokens: 917504,
+    maxInputTokens: 983040,
     maxOutputTokens: 65536,
     thinking: false,
   },

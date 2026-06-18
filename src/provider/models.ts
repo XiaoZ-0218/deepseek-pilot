@@ -1,6 +1,6 @@
 import vscode from 'vscode';
 import { getReasoningEffort, type ReasoningEffort } from '../config';
-import { MAX_TOOLS_PER_REQUEST, MODELS } from '../consts';
+import { MAX_TOOLS_PER_REQUEST, MODELS, priceFields } from '../consts';
 
 export type ModelConfigurationOptions = vscode.ProvideLanguageModelChatResponseOptions & {
   readonly modelConfiguration?: Record<string, unknown>;
@@ -20,9 +20,14 @@ type RuntimeLanguageModelChatInformation = vscode.LanguageModelChatInformation &
   category?: { label: string; order: number };
   configurationSchema?: ThinkingEffortConfigurationSchema;
   capabilities: RuntimeLanguageModelChatCapabilities;
+  inputCost?: string;
+  outputCost?: string;
+  cacheCost?: string;
 };
 
-const API_KEY_REQUIRED_DETAIL = vscode.l10n.t('No API key configured. Use "DeepSeek Pilot: Manage Provider" or "DeepSeek Pilot: Set API Key".');
+const API_KEY_REQUIRED_DETAIL = vscode.l10n.t(
+  'No API key configured. Use "DeepSeek Pilot: Manage Provider" or "DeepSeek Pilot: Set API Key".',
+);
 
 export function toChatInfo(
   model: (typeof MODELS)[number],
@@ -57,6 +62,10 @@ export function toChatInfo(
       // long tool lists upstream instead of letting our request.ts throw.
       toolCalling: MAX_TOOLS_PER_REQUEST,
     },
+    // Non-public cost fields so DeepSeek's prices surface in Copilot's native
+    // picker cost slots. Hosts that don't read them ignore them; the `detail`
+    // string carries the same numbers as a visible fallback.
+    ...(hasKey ? priceFields(model.family) : {}),
     ...(model.thinking ? { configurationSchema: buildThinkingEffortSchema() } : {}),
   };
 
@@ -71,11 +80,7 @@ export function getConfiguredThinkingEffort(options: ModelConfigurationOptions):
   // and `xhigh` is mapped to `max` for forward/backward compatibility with
   // other vendors' effort taxonomies (OpenAI, Anthropic, etc).
   if (configuredEffort === 'max' || configuredEffort === 'xhigh') return 'max';
-  if (
-    configuredEffort === 'high' ||
-    configuredEffort === 'medium' ||
-    configuredEffort === 'low'
-  ) {
+  if (configuredEffort === 'high' || configuredEffort === 'medium' || configuredEffort === 'low') {
     return 'high';
   }
   return getReasoningEffort();

@@ -30,6 +30,7 @@
   "DeepSeek rejected the request schema (422). Likely a host/extension mismatch. {0}": "DeepSeek 拒绝了请求格式 (422)。可能是主机/扩展不匹配。{0}",
   "DeepSeek rate limited (429). The extension already retried — try again in a moment.": "DeepSeek 速率限制 (429)。扩展已自动重试——请稍后再试。",
   "DeepSeek server is having trouble ({0}). The extension already retried — please retry in a moment.": "DeepSeek 服务器遇到问题 ({0})。扩展已自动重试——请稍后再试。",
+  "Could not reach DeepSeek ({0}). Check your network connection, any VPN/proxy, and the `deepseek-pilot.baseUrl` setting.": "无法连接 DeepSeek ({0})。请检查你的网络连接、任何 VPN/代理，以及 `deepseek-pilot.baseUrl` 设置。",
   "Open DeepSeek Billing": "打开 DeepSeek 账单",
   "Reload Window": "重新加载窗口",
   "Show Logs": "显示日志",

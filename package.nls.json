@@ -17,6 +17,7 @@
   "deepseek-pilot.config.contextWarnThreshold": "Percent of the model's context window at which the context-window status bar item turns yellow (warning). Below this, the indicator stays neutral and advises against compacting — DeepSeek's KV cache makes compaction expensive when there's still room.",
   "deepseek-pilot.config.debug": "Enable diagnostic debug logging.",
   "deepseek-pilot.config.maxTokens": "Maximum output tokens per request. 0 = API default (no limit).",
+  "deepseek-pilot.config.optimizeUtilityRequests": "Automatically disable extended thinking for Copilot's lightweight background requests (chat titles, commit messages, branch names, etc.) when a `(thinking)` variant is the active model, so reasoning tokens aren't spent on them. Detected heuristically from the request's system prompt and only applied on the official DeepSeek endpoint. Turn this off if thinking is ever disabled when you didn't expect it.",
   "deepseek-pilot.config.modelIdOverrides": "Optional API model ID overrides for DeepSeek-compatible proxy endpoints.",
   "deepseek-pilot.config.modelIdOverrides.flash": "API model ID to use for DeepSeek V4 Flash variants.",
   "deepseek-pilot.config.modelIdOverrides.pro": "API model ID to use for DeepSeek V4 Pro variants.",

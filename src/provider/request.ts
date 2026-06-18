@@ -7,9 +7,16 @@ import { resolveImageMessages, type VisionDescriptionCacheStats } from './vision
 import { logger } from '../logger';
 import { safeJsonStringify } from '../json';
 import { MODELS } from '../consts';
-import { getApiModelId, getApiUrl, getMaxTokens } from '../config';
+import {
+  getApiModelId,
+  getApiUrl,
+  getMaxTokens,
+  getOptimizeUtilityRequests,
+  isOfficialBaseUrl,
+} from '../config';
 import { getConfiguredThinkingEffort, type ModelConfigurationOptions } from './models';
 import { sanitizeFunctionName, sanitizeSchema } from './sanitize';
+import { isUtilityRequest } from './request-kind';
 import { validateRequest } from './validate';
 import { logCacheTraceSnapshot, snapshotCacheTrace } from './diagnostics';
 
@@ -22,6 +29,14 @@ export interface PreparedRequest {
   stream: boolean;
   inputCharCount: number;
   cacheDiagnostics: VisionDescriptionCacheStats;
+  /**
+   * Maps sanitized tool function names back to the original names VS Code gave
+   * us. DeepSeek requires names matching `^[a-zA-Z][a-zA-Z0-9_-]*$`, so we
+   * sanitize before sending; the streamed tool call echoes the sanitized name,
+   * but the host routes tool calls by the ORIGINAL name — stream.ts uses this
+   * to translate back. Empty when no name needed sanitizing (the common case).
+   */
+  toolNameMap: ReadonlyMap<string, string>;
 }
 
 const MAX_TOOLS_PER_REQUEST = 128;
@@ -35,7 +50,8 @@ export async function prepareChatRequest(params: {
   reasoningCache: ReasoningCache;
   getVisionModel: () => Promise<vscode.LanguageModelChat | null>;
 }): Promise<PreparedRequest> {
-  const { authManager, modelInfo, messages, options, token, reasoningCache, getVisionModel } = params;
+  const { authManager, modelInfo, messages, options, token, reasoningCache, getVisionModel } =
+    params;
 
   const apiKey = await authManager.getApiKey();
   if (!apiKey) throw new Error('DeepSeek API key not configured');
@@ -61,7 +77,19 @@ export async function prepareChatRequest(params: {
   const variant = MODELS.find((m) => m.id === modelInfo.id);
   if (!variant) throw new Error(`Unknown model: ${modelInfo.id}`);
 
-  const thinking = variant.version === 'thinking';
+  // A thinking variant normally enables reasoning, but Copilot's lightweight
+  // auxiliary flows (chat titles, commit messages, etc.) get no benefit from
+  // it. When we detect one — and only against the official endpoint, since a
+  // proxy may map models differently — force thinking off to save reasoning
+  // tokens and latency. See request-kind.ts.
+  const variantThinking = variant.version === 'thinking';
+  const hasTools = !!(options.tools && options.tools.length > 0);
+  const thinking =
+    variantThinking &&
+    !(getOptimizeUtilityRequests() && isOfficialBaseUrl() && isUtilityRequest(messages, hasTools));
+  if (variantThinking && !thinking) {
+    logger.info('[req] utility flow detected — forcing thinking off to save reasoning tokens');
+  }
 
   // Convert to OpenAI format. The convert step:
   //   - enforces tool_call → tool_result ordering
@@ -74,8 +102,13 @@ export async function prepareChatRequest(params: {
   }
 
   // Convert tool definitions through the sanitization pipeline.
+  const toolNameMap = new Map<string, string>();
   let tools: OpenAIFunctionToolDef[] | undefined;
-  let toolChoice: 'auto' | { type: 'function'; function: { name: string } } | undefined;
+  let toolChoice:
+    | 'auto'
+    | 'required'
+    | { type: 'function'; function: { name: string } }
+    | undefined;
   if (options.tools && options.tools.length > 0) {
     if (options.tools.length > MAX_TOOLS_PER_REQUEST) {
       throw new Error(`Cannot have more than ${MAX_TOOLS_PER_REQUEST} tools per request.`);
@@ -84,6 +117,10 @@ export async function prepareChatRequest(params: {
       .filter((t) => t && typeof t === 'object')
       .map((t) => {
         const name = sanitizeFunctionName(t.name);
+        // Record the reverse mapping so stream.ts can emit the tool call under
+        // the original name the host knows (it routes by that, not the
+        // sanitized name). Only stored when sanitizing actually changed it.
+        if (name !== t.name) toolNameMap.set(name, t.name);
         const description = typeof t.description === 'string' ? t.description : '';
         const parameters = sanitizeSchema(t.inputSchema ?? { type: 'object', properties: {} });
         return {
@@ -94,12 +131,13 @@ export async function prepareChatRequest(params: {
 
     toolChoice = 'auto';
     if (options.toolMode === vscode.LanguageModelChatToolMode.Required) {
-      if (tools.length !== 1) {
-        throw new Error(
-          'LanguageModelChatToolMode.Required is not supported with more than one tool',
-        );
-      }
-      toolChoice = { type: 'function', function: { name: tools[0]!.function.name } };
+      // DeepSeek supports the OpenAI-standard tool_choice. Force a specific tool
+      // when there's exactly one; otherwise use the generic "required" literal
+      // (the model must call some tool) — previously we threw for >1 tool.
+      toolChoice =
+        tools.length === 1
+          ? { type: 'function', function: { name: tools[0]!.function.name } }
+          : 'required';
     }
   }
 
@@ -129,23 +167,28 @@ export async function prepareChatRequest(params: {
     // non-thinking and thinking variants behave identically over the wire.
     body.thinking = { type: 'disabled' };
 
+    // DeepSeek accepts temperature in [0, 2]; clamp a host value so it can't
+    // 422 the request. Default 0.7 favors more deterministic coding output.
     const requestedTemp = options.modelOptions?.temperature;
-    if (typeof requestedTemp === 'number') {
-      body.temperature = requestedTemp;
-    } else {
-      body.temperature = 0.7;
-    }
+    body.temperature = typeof requestedTemp === 'number' ? clamp(requestedTemp, 0, 2) : 0.7;
+
     // Allow-list non-thinking tuning options from the host.
     const mo = options.modelOptions as Record<string, unknown> | undefined;
     if (mo) {
-      if (typeof mo.stop === 'string' || Array.isArray(mo.stop)) body.stop = mo.stop;
-      // frequency_penalty / presence_penalty are documented as deprecated for
-      // v4 but the API still accepts them. Pass through if the host asks.
-      if (typeof mo.frequency_penalty === 'number') body.frequency_penalty = mo.frequency_penalty;
-      if (typeof mo.presence_penalty === 'number') body.presence_penalty = mo.presence_penalty;
-      if (typeof mo.top_p === 'number') body.top_p = mo.top_p;
+      // `stop`: DeepSeek caps at 16 sequences — trim longer arrays.
+      if (typeof mo.stop === 'string') {
+        body.stop = mo.stop;
+      } else if (Array.isArray(mo.stop)) {
+        body.stop = mo.stop.slice(0, 16);
+      }
+      if (typeof mo.top_p === 'number') body.top_p = clamp(mo.top_p, 0, 1);
       if (typeof mo.logprobs === 'boolean') body.logprobs = mo.logprobs;
-      if (typeof mo.top_logprobs === 'number') body.top_logprobs = Math.min(20, mo.top_logprobs);
+      if (typeof mo.top_logprobs === 'number') {
+        body.top_logprobs = Math.min(20, Math.max(0, mo.top_logprobs));
+      }
+      // frequency_penalty / presence_penalty are no longer supported by the
+      // DeepSeek V4 API (api-docs.deepseek.com/api/create-chat-completion) —
+      // intentionally not forwarded.
     }
   }
 
@@ -204,7 +247,12 @@ export async function prepareChatRequest(params: {
     stream: true,
     inputCharCount,
     cacheDiagnostics,
+    toolNameMap,
   };
+}
+
+function clamp(n: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, n));
 }
 
 function countRequestChars(

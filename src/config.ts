@@ -20,6 +20,11 @@ export function getApiUrl(path: string): string {
   return new URL(path.replace(/^\/+/, ''), `${getBaseUrl()}/`).toString();
 }
 
+/** True when pointed at DeepSeek's own API (not a compatible proxy/gateway). */
+export function isOfficialBaseUrl(): boolean {
+  return getBaseUrl() === 'https://api.deepseek.com';
+}
+
 export function getApiModelId(modelId: string): string {
   const overrides = getConfig().get<Record<string, string>>('modelIdOverrides');
   const override = overrides?.[modelId]?.trim();
@@ -28,6 +33,10 @@ export function getApiModelId(modelId: string): string {
 
 export function getMaxTokens(): number {
   return getConfig().get<number>('maxTokens', 0);
+}
+
+export function getOptimizeUtilityRequests(): boolean {
+  return getConfig().get<boolean>('optimizeUtilityRequests', true);
 }
 
 export function getReasoningEffort(): ReasoningEffort {

@@ -54,8 +54,12 @@ export async function streamChatCompletion(params: {
     const parsed = tryParseJSONObject(buf.args);
     if (!parsed.ok) return;
     const id = buf.id ?? `call_${Math.random().toString(36).slice(2, 10)}`;
+    // Keep the sanitized (wire) name for the reasoning-cache fingerprint so it
+    // stays consistent with convert.ts; hand the host the ORIGINAL name so it
+    // can route the call (it matches by the name it gave us, not ours).
     emittedToolCalls.push({ id, name: buf.name });
-    progress.report(new vscode.LanguageModelToolCallPart(id, buf.name, parsed.value));
+    const hostName = prepared.toolNameMap.get(buf.name) ?? buf.name;
+    progress.report(new vscode.LanguageModelToolCallPart(id, hostName, parsed.value));
     toolCallBuffers.delete(idx);
     completedToolCallIndices.add(idx);
   };
@@ -66,7 +70,9 @@ export async function streamChatCompletion(params: {
       const parsed = tryParseJSONObject(buf.args);
       if (!parsed.ok) {
         if (throwOnInvalid) {
-          logger.error(`Invalid JSON in tool call idx=${idx} snippet=${(buf.args || '').slice(0, 200)}`);
+          logger.error(
+            `Invalid JSON in tool call idx=${idx} snippet=${(buf.args || '').slice(0, 200)}`,
+          );
           throw new Error('Invalid JSON for tool call');
         }
         continue;
@@ -74,7 +80,8 @@ export async function streamChatCompletion(params: {
       const id = buf.id ?? `call_${Math.random().toString(36).slice(2, 10)}`;
       const name = buf.name ?? 'unknown_tool';
       emittedToolCalls.push({ id, name });
-      progress.report(new vscode.LanguageModelToolCallPart(id, name, parsed.value));
+      const hostName = prepared.toolNameMap.get(name) ?? name;
+      progress.report(new vscode.LanguageModelToolCallPart(id, hostName, parsed.value));
       toolCallBuffers.delete(idx);
       completedToolCallIndices.add(idx);
     }
@@ -150,9 +157,7 @@ export async function streamChatCompletion(params: {
           // `mimeType === "usage"` and parses the data as OpenAI-shape
           // usage. See USAGE_MIME_TYPE in ../consts. Older hosts ignore.
           try {
-            progress.report(
-              vscode.LanguageModelDataPart.json(usage, USAGE_MIME_TYPE),
-            );
+            progress.report(vscode.LanguageModelDataPart.json(usage, USAGE_MIME_TYPE));
           } catch {
             /* best-effort — must not break the stream for a display hint */
           }
@@ -186,12 +191,16 @@ export async function streamChatCompletion(params: {
                 );
               } catch {
                 if (!hasShownThinkingHint) {
-                  progress.report(new vscode.LanguageModelTextPart(vscode.l10n.t('💭 Thinking...\n\n')));
+                  progress.report(
+                    new vscode.LanguageModelTextPart(vscode.l10n.t('💭 Thinking...\n\n')),
+                  );
                   hasShownThinkingHint = true;
                 }
               }
             } else if (!hasShownThinkingHint) {
-              progress.report(new vscode.LanguageModelTextPart(vscode.l10n.t('💭 Thinking...\n\n')));
+              progress.report(
+                new vscode.LanguageModelTextPart(vscode.l10n.t('💭 Thinking...\n\n')),
+              );
               hasShownThinkingHint = true;
             }
           }
@@ -245,7 +254,9 @@ export async function streamChatCompletion(params: {
     if (sawInsufficientSystemResource) {
       void vscode.window
         .showErrorMessage(
-          vscode.l10n.t('DeepSeek backend ran out of capacity mid-stream. The response is incomplete — please resend.'),
+          vscode.l10n.t(
+            'DeepSeek backend ran out of capacity mid-stream. The response is incomplete — please resend.',
+          ),
           vscode.l10n.t('Show Logs'),
         )
         .then((choice) => {
@@ -255,7 +266,9 @@ export async function streamChatCompletion(params: {
         });
     } else if (sawLengthTruncation) {
       void vscode.window.showWarningMessage(
-        vscode.l10n.t('DeepSeek response was truncated (max_tokens limit). Consider increasing `deepseek-pilot.maxTokens`.'),
+        vscode.l10n.t(
+          'DeepSeek response was truncated (max_tokens limit). Consider increasing `deepseek-pilot.maxTokens`.',
+        ),
       );
     }
   } catch (e) {

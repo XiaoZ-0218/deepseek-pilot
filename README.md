@@ -1,21 +1,43 @@
-# DeepSeek Pilot — VS Code Extension
+# DeepSeek Pilot — DeepSeek V4 in GitHub Copilot Chat
 
-Run **DeepSeek V4 Pro & Flash** inside GitHub Copilot Chat — with the small comforts that make long agentic sessions actually pleasant.
+**Pick DeepSeek V4 Pro or Flash from the Copilot Chat model picker — and keep everything Copilot already gives you.** Agent mode, tool calling, MCP servers, custom instructions, skills: all of it keeps working, now running on DeepSeek, with your own API key.
 
-DeepSeek's V4 models are dramatically cheaper than the flagships from OpenAI and Anthropic while staying competitive on coding work, and their prefix-cache pricing means a long, stable chat gets *cheaper and faster* as it grows. Copilot Chat ships generic BYOK support — DeepSeek Pilot adds the DeepSeek-specific pieces on top: KV-cache-aware compaction guidance, real session cost and platform balance in the status bar, vision attachments routed through a describer model, and one-click wiring as Copilot's hidden utility model for titles and commit messages.
+DeepSeek's V4 models are dramatically cheaper than the flagships from OpenAI and Anthropic while staying competitive on coding work — and their prefix-cache pricing means a long, stable chat gets *cheaper and faster* as it grows. Copilot Chat ships generic BYOK support; DeepSeek Pilot adds the DeepSeek-specific layer on top: live session cost and platform balance in the status bar, KV-cache-aware compaction guidance, a per-model thinking-effort control, vision attachments routed through a describer model, and one-click wiring as Copilot's hidden utility model.
 
 Requires **VS Code 1.120+** and the GitHub Copilot Chat extension.
 
+## Why DeepSeek Pilot
+
+- **Don't replace Copilot — power it up.** No new sidebar, no second chat UI to learn. Just a new model in the picker you already use, so agent mode, tool calling, MCP, `.instructions.md`, `AGENTS.md`, and skills all keep working — now on DeepSeek.
+- **See what you're spending.** Real per-session cost in your account currency (USD/CNY auto-detected), live DeepSeek platform balance, cache-hit rate, and token counts — right in the status bar, not buried in a log.
+- **Spend the cache, not your money.** DeepSeek bills a long, stable chat at the ~90%-cheaper cache-hit rate. The status bar tells you exactly when compacting would *cost* you more than it saves — guidance a generic BYOK widget can't give.
+- **BYOK, pay DeepSeek directly.** Your key, your bill, your rate limits — stored in the OS keychain, never in `settings.json` or your Git history.
+
 ## What you get
 
+- **Everything Copilot does, on DeepSeek** — because this registers as a native Copilot model provider, agent mode, tool calling, MCP servers, custom instructions, and skills all work unchanged. Switch models mid-chat without losing history.
 - **Four model variants in the picker** — Pro and Flash, each with thinking / non-thinking modes, grouped under one **DeepSeek V4** row. Thinking variants expose a per-model **Thinking Effort** (high / max) control.
 - **Drop images into chat with a text-only model** — a vision-capable describer model summarises each attachment so DeepSeek can reason over the content. Descriptions are cached by image hash, so the same screenshot never re-bills.
 - **Live context-window indicator, DeepSeek-aware** — status-bar item showing `% of window used · cache-hit %` with KV-cache-aware guidance ("keep going, your cache is healthy" vs. "compact now"). Configurable thresholds.
 - **Real session cost & platform balance** — token counts, running spend in your account currency (USD / CNY auto-detected from the DeepSeek API), and a one-click balance refresh. Pricing matches DeepSeek's permanent V4-Pro 75%-off + 1/10 cache-hit rates (announced 2026-05-22).
 - **Persistent reasoning cache** — reasoning traces from thinking variants are fingerprinted, persisted across VS Code restarts, and replayed during multi-turn agent loops so DeepSeek's KV cache stays warm.
 - **Wire as Copilot's utility + utility-small models** — two one-click commands route Copilot's background flows (chat titles, summaries, commit messages, intent detection — plus the lightweight fast-path slot Copilot Chat 1.121 exposes) through DeepSeek Flash, where the dollar cost is negligible.
-- **Production-grade request pipeline** — schema sanitisation, tool-call / tool-result pairing, mid-stream truncation detection, retry on transient failures, and debug-only cache-trace snapshots for diagnosing odd 400s without leaking message content.
+- **Production-grade request pipeline** — schema sanitisation, tool-call / tool-result pairing, mid-stream truncation detection, retry on transient failures, automatic thinking-off for Copilot's background utility requests (titles, commit messages) so reasoning tokens aren't spent on them, and debug-only cache-trace snapshots for diagnosing odd 400s without leaking message content.
 - **Friendly setup** — variants stay visible in the picker before an API key is configured (with a warning icon), and key validation probes the configured endpoint before saving, with a fall-through path for proxy tokens that can't be validated upstream.
+
+## Compared to the alternatives
+
+| | DeepSeek Pilot | Local proxy (e.g. LiteLLM) | Standalone DeepSeek extension |
+| --- | --- | --- | --- |
+| Works inside Copilot Chat | Yes | Yes | No — separate UI |
+| Copilot agent mode, tools, MCP, skills | Yes | Yes | Reimplemented, partial |
+| Vision / image attachments | Yes — proxied | No | No |
+| Live cost, balance & cache-hit in the status bar | Yes | No | Varies |
+| KV-cache-aware compaction guidance | Yes | No | No |
+| Per-session spend in your account currency | Yes | No | No |
+| No extra process to run | Yes | No | Yes |
+| API key in the OS keychain | Yes | No | Varies |
+| One-click install | Yes | No | Yes |
 
 ## Install
 
@@ -104,6 +126,7 @@ Adjust thresholds via `deepseek-pilot.contextWarnThreshold` and `deepseek-pilot.
 ## Configuration
 
 - `deepseek-pilot.reasoningEffort`: default effort for `(thinking)` variants
+- `deepseek-pilot.optimizeUtilityRequests`: auto-disable thinking on Copilot's background utility requests (titles, commit messages) when a thinking variant is active; default on
 - `deepseek-pilot.modelIdOverrides`: remap API model IDs for DeepSeek-compatible proxy endpoints
 - `deepseek-pilot.baseUrl`: switch between DeepSeek and compatible gateways
 - `deepseek-pilot.contextWarnThreshold` / `deepseek-pilot.contextCriticalThreshold`: percent thresholds for the context-window indicator
@@ -117,9 +140,9 @@ This extension started life by surveying two earlier MIT-licensed DeepSeek-in-Co
 
 Free and MIT-licensed. If it helps:
 
-- ★ Star the repo on [GitHub](https://github.com/setsey/deepseek-pilot)
-- 💖 [Sponsor on GitHub](https://github.com/sponsors/setsey)
-- 🐞 [File issues](https://github.com/setsey/deepseek-pilot/issues) — include the **DeepSeek Pilot: Show Logs** output if you hit something odd
+- Star the repo on [GitHub](https://github.com/setsey/deepseek-pilot)
+- [Sponsor on GitHub](https://github.com/sponsors/setsey)
+- [File an issue](https://github.com/setsey/deepseek-pilot/issues) — include the **DeepSeek Pilot: Show Logs** output if you hit something odd
 
 ## License
 

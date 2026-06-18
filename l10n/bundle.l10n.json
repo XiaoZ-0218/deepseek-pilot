@@ -30,6 +30,7 @@
   "DeepSeek rejected the request schema (422). Likely a host/extension mismatch. {0}": "DeepSeek rejected the request schema (422). Likely a host/extension mismatch. {0}",
   "DeepSeek rate limited (429). The extension already retried — try again in a moment.": "DeepSeek rate limited (429). The extension already retried — try again in a moment.",
   "DeepSeek server is having trouble ({0}). The extension already retried — please retry in a moment.": "DeepSeek server is having trouble ({0}). The extension already retried — please retry in a moment.",
+  "Could not reach DeepSeek ({0}). Check your network connection, any VPN/proxy, and the `deepseek-pilot.baseUrl` setting.": "Could not reach DeepSeek ({0}). Check your network connection, any VPN/proxy, and the `deepseek-pilot.baseUrl` setting.",
   "Open DeepSeek Billing": "Open DeepSeek Billing",
   "Reload Window": "Reload Window",
   "Show Logs": "Show Logs",

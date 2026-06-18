@@ -2,7 +2,13 @@
 .github/**
 .githooks/**
 .claude/**
+.agents/**
+.codex/**
+AGENTS.md
 .vscode/**
+.oxfmtrc.json
+vitest.config.ts
+test/**
 CLAUDE.md
 dist/**
 ext/**

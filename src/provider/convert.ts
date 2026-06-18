@@ -3,6 +3,7 @@ import type { OpenAIChatMessage, OpenAIToolCall } from '../types';
 import { safeJsonStringify } from '../json';
 import { logger } from '../logger';
 import { fingerprintAssistantTurn, type ReasoningCache } from './cache';
+import { sanitizeFunctionName } from './sanitize';
 
 /**
  * Convert VS Code chat messages to OpenAI/DeepSeek-compatible format.
@@ -56,13 +57,16 @@ export function convertMessages(
         }
 
         if (part instanceof vscode.LanguageModelToolCallPart) {
-          const id =
-            part.callId || `call_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+          const id = part.callId || `call_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
           toolCalls.push({
             id,
             type: 'function',
             function: {
-              name: part.name,
+              // Sanitize to match the tool definitions request.ts sends (the
+              // API rejects names outside its charset). A no-op for the common
+              // case of already-valid names; keeps the wire name consistent
+              // with the reasoning-cache fingerprint computed in stream.ts.
+              name: sanitizeFunctionName(part.name),
               arguments: safeJsonStringify(part.input ?? {}),
             },
           });

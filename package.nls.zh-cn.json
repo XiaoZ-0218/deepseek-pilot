@@ -17,6 +17,7 @@
   "deepseek-pilot.config.contextWarnThreshold": "上下文窗口使用百分比阈值，达到时状态栏变为黄色（警告）。低于此值时指示器保持中性并建议不要压缩——当空间充足时，DeepSeek 的 KV 缓存使压缩代价高昂。",
   "deepseek-pilot.config.debug": "启用诊断调试日志。",
   "deepseek-pilot.config.maxTokens": "每次请求的最大输出 token 数。0 = API 默认值（无限制）。",
+  "deepseek-pilot.config.optimizeUtilityRequests": "当 `(thinking)` 变体为当前模型时，自动为 Copilot 的轻量级后台请求（对话标题、提交信息、分支名等）禁用扩展思考，以免在这些请求上消耗推理 token。通过请求的系统提示词启发式检测，且仅在官方 DeepSeek 端点上生效。如果在你意料之外禁用了思考，请关闭此项。",
   "deepseek-pilot.config.modelIdOverrides": "适用于 DeepSeek 兼容代理端点的可选 API 模型 ID 覆盖。",
   "deepseek-pilot.config.modelIdOverrides.flash": "用于 DeepSeek V4 Flash 变体的 API 模型 ID。",
   "deepseek-pilot.config.modelIdOverrides.pro": "用于 DeepSeek V4 Pro 变体的 API 模型 ID。",
