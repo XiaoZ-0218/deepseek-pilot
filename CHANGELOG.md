@@ -2,6 +2,11 @@
 
 All notable changes to **DeepSeek Pilot** are recorded here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] — 2026-06-18
+
+### Documentation
+- Note in the README and Marketplace listing that DeepSeek retires the legacy `deepseek-chat` / `deepseek-reasoner` model names on 2026-07-24 (until then they resolve to V4 Flash). This extension already targets `deepseek-v4-pro` / `deepseek-v4-flash`, so it is unaffected and exposes Pro as well as Flash.
+
 ## [0.4.0] — 2026-06-18
 
 Aligns the provider with the current DeepSeek V4 API (re-verified against [api-docs.deepseek.com](https://api-docs.deepseek.com/) on 2026-06-18) and adds two cost/quality features. The `deepseek-v4-pro` / `deepseek-v4-flash` model IDs this extension targets are confirmed current; the legacy `deepseek-chat` / `deepseek-reasoner` IDs are deprecated and retire 2026-07-24, so this extension is unaffected by that sunset.

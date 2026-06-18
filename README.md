@@ -6,6 +6,8 @@ DeepSeek's V4 models are dramatically cheaper than the flagships from OpenAI and
 
 Requires **VS Code 1.120+** and the GitHub Copilot Chat extension.
 
+> **Model rename heads-up:** DeepSeek is retiring the legacy `deepseek-chat` and `deepseek-reasoner` model names on **2026-07-24**; until then they quietly resolve to V4 Flash. DeepSeek Pilot already targets the current `deepseek-v4-pro` / `deepseek-v4-flash` models, so it keeps working through the switch — and lets you pick **Pro**, not just Flash.
+
 ## Why DeepSeek Pilot
 
 - **Don't replace Copilot — power it up.** No new sidebar, no second chat UI to learn. Just a new model in the picker you already use, so agent mode, tool calling, MCP, `.instructions.md`, `AGENTS.md`, and skills all keep working — now on DeepSeek.
