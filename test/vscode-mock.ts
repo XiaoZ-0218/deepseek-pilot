@@ -8,4 +8,23 @@ export class LanguageModelTextPart {
 
 export const LanguageModelChatMessageRole = { User: 1, Assistant: 2 } as const;
 
-export default { LanguageModelTextPart, LanguageModelChatMessageRole };
+// logger.ts constructs its output channel at module scope, so importing any
+// module that reaches it (stream.ts does) needs `window` to exist.
+export const window = {
+  createOutputChannel: () => ({
+    appendLine: () => {},
+    append: () => {},
+    clear: () => {},
+    show: () => {},
+    hide: () => {},
+    dispose: () => {},
+    replace: () => {},
+    name: 'DeepSeek Pilot',
+  }),
+};
+
+export const workspace = {
+  getConfiguration: () => ({ get: () => undefined }),
+};
+
+export default { LanguageModelTextPart, LanguageModelChatMessageRole, window, workspace };

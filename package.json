@@ -3,7 +3,7 @@
   "displayName": "DeepSeek Pilot — Vision + Token Tracking",
   "description": "DeepSeek V4 Pro & Flash in GitHub Copilot Chat. Vision proxy for image attachments, KV-cache-aware context-window indicator, persistent reasoning cache, live session cost and platform balance in the status bar, a thinking-effort selector per model variant, and one-click wiring as Copilot's utility/utility-small model.",
   "icon": "resources/icon.png",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "publisher": "konstantyn-ganenkov",
   "license": "MIT",
   "repository": {
@@ -259,12 +259,12 @@
     "publish": "npx @vscode/vsce publish"
   },
   "devDependencies": {
-    "@types/node": "^25.6.0",
+    "@types/node": "^25.9.5",
     "@types/vscode": "^1.120.0",
-    "@vscode/vsce": "^3.9.1",
-    "oxfmt": "^0.47.0",
-    "oxlint": "^1.62.0",
-    "typescript": "^6.0.3",
+    "@vscode/vsce": "^3.9.2",
+    "oxfmt": "^0.60.0",
+    "oxlint": "^1.75.0",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.9"
   }
 }

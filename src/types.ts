@@ -43,6 +43,12 @@ export interface DSUsage {
   completion_tokens?: number;
   total_tokens?: number;
   completion_tokens_details?: { reasoning_tokens?: number };
+  /**
+   * OpenAI's cached-prompt field. DeepSeek does not send it — it reports cache
+   * hits as `prompt_cache_hit_tokens` — but the host reads this one, so
+   * `toHostUsage` in provider/stream.ts synthesizes it on the way out.
+   */
+  prompt_tokens_details?: { cached_tokens?: number };
 }
 
 export interface DSBalance {

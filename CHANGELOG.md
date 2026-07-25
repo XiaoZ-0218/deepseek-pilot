@@ -2,6 +2,21 @@
 
 All notable changes to **DeepSeek Pilot** are recorded here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.3] — 2026-07-25
+
+Re-verification pass against the live DeepSeek V4 API ([api-docs.deepseek.com](https://api-docs.deepseek.com/zh-cn/), checked 2026-07-25) and the current host (VS Code 1.130 with Copilot Chat 0.58.0). Model IDs, the 1M-token shared window, the 384K output ceiling, and all six pricing figures are confirmed unchanged. One host contract had drifted.
+
+### Fixed
+- **Copilot's native cached-token readout no longer reports zero on a prefix-cache hit.** The host normalizes the `usage` data part's `prompt_tokens_details.cached_tokens` with a `?? 0` fallback, but DeepSeek reports cache hits as `prompt_cache_hit_tokens` and never sends `prompt_tokens_details` — so passing its usage object through verbatim pinned the host's figure at 0 even when the whole prompt was served from cache. `stream.ts` now maps one field onto the other on the way out. The status-bar cache-hit % was always computed from the raw DeepSeek fields and was unaffected.
+
+### Changed
+- The legacy `deepseek-chat` / `deepseek-reasoner` model names reached their **2026-07-24** retirement, so the README and developer guide now describe the sunset as done rather than upcoming. This extension has always targeted `deepseek-v4-pro` / `deepseek-v4-flash` and needed no code change.
+- Development toolchain refreshed: TypeScript 7.0.2, oxlint 1.75, oxfmt 0.60, `@vscode/vsce` 3.9.2, `@types/node` 25.9. Transitive advisories in the build tooling are cleared (`npm audit` reports 0); the extension ships no runtime dependencies, so none of them ever reached an installed copy.
+- `engines.vscode` and `@types/vscode` stay pinned at 1.120. The stable extension API is byte-identical between 1.120 and 1.125 apart from a doc-comment reorder, so raising the floor would narrow the installable base for no gain — the reasoning is recorded in the developer guide.
+
+### Added
+- Five specs covering the usage-shape translation, bringing the suite to 34.
+
 ## [0.4.2] — 2026-06-18
 
 ### Changed

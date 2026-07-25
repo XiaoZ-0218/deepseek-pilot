@@ -84,7 +84,7 @@ Copilot Chat fires many small auxiliary requests against the active model — ch
 | `deepseek-v4-flash::thinking` | 655,360 | 393,216 | yes |
 | `deepseek-v4-flash` | 983,040 | 65,536 | no |
 
-DeepSeek V4 exposes a **1M-token shared window** (input + output ≤ 1,048,576) with a 384K max-output ceiling, per [the pricing page](https://api-docs.deepseek.com/quick_start/pricing). The thinking variants reserve the full 393,216-token output so a long reasoning chain can't be silently truncated (leaving 655,360 input); the non-thinking variants reserve 64K and keep 983,040 for input. Both API models are `deepseek-v4-pro` / `deepseek-v4-flash` (sent via `getApiModelId`); the legacy `deepseek-chat` / `deepseek-reasoner` IDs retire 2026-07-24, so the V4 IDs are the forward-correct choice.
+DeepSeek V4 exposes a **1M-token shared window** (input + output ≤ 1,048,576) with a 384K max-output ceiling, per [the pricing page](https://api-docs.deepseek.com/quick_start/pricing). The thinking variants reserve the full 393,216-token output so a long reasoning chain can't be silently truncated (leaving 655,360 input); the non-thinking variants reserve 64K and keep 983,040 for input. Both API models are `deepseek-v4-pro` / `deepseek-v4-flash` (sent via `getApiModelId`); the legacy `deepseek-chat` / `deepseek-reasoner` IDs were retired on 2026-07-24, so the V4 IDs are the only ones that resolve.
 
 All four variants share `category: { label: 'DeepSeek V4' }` so they appear under one collapsible row in the model picker. Each declares `capabilities: { imageInput: true, toolCalling: 128 }` (128 = `MAX_TOOLS_PER_REQUEST` in [consts.ts](src/consts.ts) — matches the DeepSeek API cap). Thinking variants additionally expose a `configurationSchema` for the per-model "Thinking Effort" picker (`high` / `max`). Each also carries non-public `inputCost` / `outputCost` / `cacheCost` strings (from `priceFields` in [consts.ts](src/consts.ts)) so DeepSeek's prices render in Copilot's native cost slots; hosts that don't read them ignore them, and the `detail` string carries the same numbers as a visible fallback.
 
@@ -95,6 +95,7 @@ npm install              # Install dependencies
 npm run compile          # Clean + tsc
 npm run watch            # Clean + tsc --watch
 npm run lint             # npx oxlint
+npm test                 # vitest run
 npm run format           # npx oxfmt --write src/
 npm run package          # Full clean build + VSIX → dist/
 npm run publish          # npx @vscode/vsce publish
@@ -103,7 +104,7 @@ npm run publish          # npx @vscode/vsce publish
 ## Conventions
 
 - **Author identity** is `setsey <k.ganenkov@gmail.com>` (configured in local git). Single authorship — no co-author trailers.
-- **Before committing**, `npm run compile` and `npm run lint` must both be green (0 TS errors, 0 lint findings). There are no tests yet.
+- **Before committing**, `npm run compile`, `npm run lint`, and `npm test` must all be green (0 TS errors, 0 lint findings, all vitest specs passing). `vscode` is aliased to `test/vscode-mock.ts` — extend that stub when a newly-tested module reaches a part of the host API it doesn't cover yet.
 - **One source of truth for the version**: `package.json` `"version"`. `CHANGELOG.md`'s top entry mirrors it; bump them together.
 - **Comments explain WHY, not WHAT.** Skip docstrings that restate the function name; comment a non-obvious constraint, a host-API quirk, or a subtle invariant (the duck-typing note in `tokens.ts` is the model).
 - **No emojis in prose / markdown / JSON.** UI strings literally rendered to a user are the only exception.
@@ -116,13 +117,23 @@ npm run publish          # npx @vscode/vsce publish
 The long-standing zero-usage bug ([microsoft/vscode#313458](https://github.com/microsoft/vscode/issues/313458), #309207, #314722) was fixed in VS Code 1.120. The built-in chat-view widget now reads:
 
 1. `provideTokenCount` for the prompt-size estimate while the user is typing.
-2. `LanguageModelDataPart.json(usage, 'usage')` — emitted by `stream.ts` once DeepSeek's `usage` chunk arrives — for the post-turn actual count. The bundled Copilot Chat BYOK consumer (in `f6cfa2ea24/resources/app/extensions/copilot/`) matches on the literal MIME `"usage"` and requires the JSON to carry `prompt_tokens`, `completion_tokens`, and `total_tokens` as numbers; DeepSeek's usage chunk satisfies all three natively.
+2. `LanguageModelDataPart.json(usage, 'usage')` — emitted by `stream.ts` once DeepSeek's `usage` chunk arrives — for the post-turn actual count. The bundled Copilot Chat BYOK consumer matches on the literal MIME `"usage"` and requires the JSON to carry `prompt_tokens`, `completion_tokens`, and `total_tokens` as numbers; DeepSeek's usage chunk satisfies all three natively. It then normalizes `prompt_tokens_details.cached_tokens` with a `?? 0` fallback — DeepSeek never sends that field (it reports `prompt_cache_hit_tokens` instead), so `toHostUsage` in `stream.ts` maps one onto the other. Without that mapping the host's cached-token readout stays pinned at 0 even on a full prefix-cache hit.
+
+Re-verify these against the bundle when a host release lands: the consumer lives in `<install>/<commit-prefix>/resources/app/extensions/copilot/dist/extension.js` (minified — grep for `prompt_tokens`). The MIME strings come from one enum: `cache_control`, `stateful_marker`, `thinking`, `context_management`, `phase_data`, `usage`. Last verified against **Copilot Chat 0.58.0, bundled with VS Code 1.130** (2026-07-25).
 
 The extension's `BalanceTracker` status bar widget is still the home for the DeepSeek-specific cache-hit % and KV-cache-aware compaction advice that the built-in widget can't show.
 
 ### Utility Models (Copilot Chat 1.121)
 
 `src/utility-model.ts` writes either `chat.utilityModel` or `chat.utilitySmallModel` with the canonical `vendor/id` of a chosen DeepSeek variant. Flash is the default suggestion — utility flows (titles, summaries, intents) get no benefit from extended thinking and Flash's pricing makes them effectively free.
+
+### The `engines.vscode` Floor
+
+`engines.vscode` and `@types/vscode` are both deliberately held at **1.120.0** even though VS Code ships 1.130. The stable `vscode.d.ts` is unchanged between 1.120 and 1.125 (the newest typings npm publishes) apart from a doc-comment reorder in `CompletionItemKind`, so nothing in the provider API has moved. Raising the floor would only shrink the installable base for zero API gain — `@types/vscode` must stay `<=` `engines.vscode` or `vsce` rejects the package, so the two move together or not at all. Diff the typings before assuming a bump is needed.
+
+### Streaming Reasoning
+
+`languageModelThinkingPart` is still a **proposed** API in 1.130, and the Marketplace won't accept an extension that declares `enabledApiProposals`. So `stream.ts` feature-detects `vscode.LanguageModelThinkingPart` at runtime and falls back to a one-shot `Thinking...` text marker — which is the path that actually runs for published builds. Keep the detection: it starts routing reasoning to the chat view's own reasoning lane the moment the API is finalized, with no code change.
 
 ### Debug Logging
 

@@ -6,7 +6,7 @@ DeepSeek's V4 models are dramatically cheaper than the flagships from OpenAI and
 
 Requires **VS Code 1.120+** and the GitHub Copilot Chat extension.
 
-> **Model rename heads-up:** DeepSeek is retiring the legacy `deepseek-chat` and `deepseek-reasoner` model names on **2026-07-24**; until then they quietly resolve to V4 Flash. DeepSeek Pilot already targets the current `deepseek-v4-pro` / `deepseek-v4-flash` models, so it keeps working through the switch — and lets you pick **Pro**, not just Flash.
+> **Model rename:** DeepSeek retired the legacy `deepseek-chat` and `deepseek-reasoner` model names on **2026-07-24**. DeepSeek Pilot has always targeted `deepseek-v4-pro` / `deepseek-v4-flash` directly, so it was unaffected by the sunset — and it lets you pick **Pro**, not just Flash.
 
 ## Why DeepSeek Pilot
 
@@ -108,7 +108,7 @@ $(sparkle) DeepSeek Pilot · 16% ctx · $0.15  $17.07
 
 ## When to compact your chat (DeepSeek-specific)
 
-VS Code's built-in chat-view context-window widget now reads real BYOK usage (as of VS Code 1.120 — fixing the long-standing [microsoft/vscode#313458](https://github.com/microsoft/vscode/issues/313458)). This extension feeds it via `LanguageModelDataPart.json(usage, "usage")` alongside DeepSeek's `usage` chunk — the bundled Copilot Chat BYOK consumer matches on the literal MIME `"usage"` and expects OpenAI-shape `prompt_tokens` / `completion_tokens` / `total_tokens` (which DeepSeek returns natively). The extension's own status-bar widget stays — it surfaces the DeepSeek-specific signal the built-in widget can't (`cache-hit %`) and the cache-aware compaction advice.
+VS Code's built-in chat-view context-window widget now reads real BYOK usage (as of VS Code 1.120 — fixing the long-standing [microsoft/vscode#313458](https://github.com/microsoft/vscode/issues/313458)). This extension feeds it via `LanguageModelDataPart.json(usage, "usage")` alongside DeepSeek's `usage` chunk — the bundled Copilot Chat BYOK consumer matches on the literal MIME `"usage"` and expects OpenAI-shape `prompt_tokens` / `completion_tokens` / `total_tokens` (which DeepSeek returns natively) plus `prompt_tokens_details.cached_tokens` (which it does not, so the extension maps DeepSeek's `prompt_cache_hit_tokens` onto it). The extension's own status-bar widget stays — it surfaces the DeepSeek-specific signal the built-in widget can't (`cache-hit %`) and the cache-aware compaction advice.
 
 The reason it matters: **DeepSeek caches by prefix**. Every request that shares its leading tokens with a recent request gets those tokens served from disk cache, billed at ~10% of the normal price and skipping the prefill step entirely. A long, stable chat accumulates a high cache-hit rate — the conversation gets *cheaper and faster* as it grows.
 

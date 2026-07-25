@@ -15,6 +15,25 @@ interface ToolCallBuffer {
   args: string;
 }
 
+/**
+ * Translate DeepSeek's usage shape into the one the host's BYOK consumer reads.
+ *
+ * Verified against Copilot Chat 0.58.0 (bundled with VS Code 1.130): the `usage`
+ * data part is normalized as
+ * `cached_tokens: Math.max(0, prompt_tokens_details?.cached_tokens ?? 0)`.
+ * DeepSeek never sends `prompt_tokens_details`, so passing its usage object
+ * through verbatim pins the host's cached-token readout at 0 even on a full
+ * cache hit. `prompt_cache_hit_tokens` carries the same number, so map it.
+ *
+ * The DeepSeek-native fields are left in place — the host ignores what it
+ * doesn't recognise, and `BalanceTracker` reads the raw object separately.
+ */
+export function toHostUsage(usage: DSUsage): DSUsage {
+  const cached = usage.prompt_cache_hit_tokens;
+  if (typeof cached !== 'number' || usage.prompt_tokens_details) return usage;
+  return { ...usage, prompt_tokens_details: { cached_tokens: cached } };
+}
+
 export async function streamChatCompletion(params: {
   prepared: PreparedRequest;
   progress: vscode.Progress<vscode.LanguageModelResponsePart>;
@@ -157,7 +176,7 @@ export async function streamChatCompletion(params: {
           // `mimeType === "usage"` and parses the data as OpenAI-shape
           // usage. See USAGE_MIME_TYPE in ../consts. Older hosts ignore.
           try {
-            progress.report(vscode.LanguageModelDataPart.json(usage, USAGE_MIME_TYPE));
+            progress.report(vscode.LanguageModelDataPart.json(toHostUsage(usage), USAGE_MIME_TYPE));
           } catch {
             /* best-effort — must not break the stream for a display hint */
           }
