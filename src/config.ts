@@ -1,6 +1,7 @@
 import vscode from 'vscode';
 
-export type ReasoningEffort = 'high' | 'max';
+/** DeepSeek V4's `reasoning_effort` values; the API defaults to `high`. */
+export type ReasoningEffort = 'low' | 'high' | 'max';
 
 function getConfig(): vscode.WorkspaceConfiguration {
   return vscode.workspace.getConfiguration('deepseek-pilot');
@@ -40,7 +41,8 @@ export function getOptimizeUtilityRequests(): boolean {
 }
 
 export function getReasoningEffort(): ReasoningEffort {
-  return getConfig().get<string>('reasoningEffort', 'max') === 'high' ? 'high' : 'max';
+  const configured = getConfig().get<string>('reasoningEffort', 'max');
+  return configured === 'low' || configured === 'high' ? configured : 'max';
 }
 
 export function getVisionModelSetting(): string {

@@ -2,6 +2,23 @@
 
 All notable changes to **DeepSeek Pilot** are recorded here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] — 2026-08-17
+
+Re-verification pass against the live DeepSeek V4 API ([pricing](https://api-docs.deepseek.com/quick_start/pricing), its [zh-cn counterpart](https://api-docs.deepseek.com/zh-cn/quick_start/pricing), and the [change log](https://api-docs.deepseek.com/updates), all read 2026-08-17). DeepSeek moved to peak/off-peak billing on **2026-08-16 16:00 UTC** and added a third reasoning-effort level when V4-Pro went GA on **2026-08-13**; both landed after the v0.4.3 check on 2026-07-25. Model IDs, the 1M-token shared window, and the 384K output ceiling are confirmed unchanged.
+
+### Fixed
+- **Cost estimation understated real spend by 1.5x to 4.7x.** The extension carried a flat rate card (Pro at $0.435 cache-miss / $0.87 output per Mtok, Flash at $0.14 / $0.28), which DeepSeek replaced on 2026-08-16 with peak and off-peak columns: Pro is now $0.66 / $1.98 off-peak and $1.32 / $3.96 at peak, Flash $0.22 / $0.66 and $0.44 / $1.32. The old figures sat below even the off-peak column, so the status bar, the model picker, and the native cost slots all under-reported — most severely during peak hours. CNY rates are updated to match the zh-cn page (Pro ¥4.5 / ¥13.5 off-peak, ¥9 / ¥27 at peak; Flash ¥1.5 / ¥4.5 and ¥3 / ¥9).
+- **The `low` reasoning effort was unreachable.** DeepSeek V4 accepts `low`, `high`, and `max`; the extension folded a host-supplied `low` into `high` and offered only two levels in the picker and the `deepseek-pilot.reasoningEffort` setting, so the cheapest thinking mode could not be selected at all. All three levels are now exposed. `medium` still maps to `high` and `xhigh` to `max`, since neither is a DeepSeek value — the `xhigh` mapping matches the one DeepSeek publishes for its own Oh My Pi integration.
+
+### Added
+- **Peak/off-peak awareness throughout.** Rates are resolved from the clock at the moment they are used, so cost estimates bill each request at the tier that was actually in force. Peak is 01:00-04:00 and 06:00-10:00 UTC; off-peak is exactly half price and covers every other hour, including the 04:00-06:00 UTC gap between the two peak windows.
+- The model picker's `detail` line and tooltip now name the current tier alongside the price, for example `Pro · thinking · $0.66/$1.98 per Mtok in/out · off-peak`. Because the two tiers differ by 2x, the figure is stamped per picker query rather than baked in at startup, so it cannot go stale in a long-running window.
+- The status-bar tooltip gains a **Rate** line showing the tier in force and the peak schedule.
+- 14 specs covering the rate table cell-for-cell against both currency pages, the peak-window boundaries, and price-string formatting. The suite is now 48.
+
+### Changed
+- Pricing consolidated into a new [`src/pricing.ts`](src/pricing.ts). It previously lived in two places that had to be kept in step by hand — a `PRICING` table in `src/provider/balance.ts` for cost computation and a separate `PRICE_USD` table in `src/consts.ts` for the picker hints — which is how the picker came to be 4x wrong in v0.3.0. Only the peak column is stored; off-peak is derived by halving, which is exact in binary floating point and matches the published off-peak column.
+
 ## [0.4.3] — 2026-07-25
 
 Re-verification pass against the live DeepSeek V4 API ([api-docs.deepseek.com](https://api-docs.deepseek.com/zh-cn/), checked 2026-07-25) and the current host (VS Code 1.130 with Copilot Chat 0.58.0). Model IDs, the 1M-token shared window, the 384K output ceiling, and all six pricing figures are confirmed unchanged. One host contract had drifted.

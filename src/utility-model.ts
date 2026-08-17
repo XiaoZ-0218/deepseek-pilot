@@ -5,6 +5,7 @@ import {
   MODELS,
 } from './consts';
 import { logger } from './logger';
+import { priceHint } from './pricing';
 
 /**
  * Wire one of our DeepSeek variants into Copilot Chat's "utility model"
@@ -15,16 +16,13 @@ import { logger } from './logger';
  * is almost always the right choice: low latency, near-zero cost, no
  * benefit from extended reasoning.
  */
-export async function setCopilotUtilityModel(
-  slot: 'primary' | 'small',
-): Promise<void> {
-  const recommendedId =
-    slot === 'small' ? 'deepseek-v4-flash' : 'deepseek-v4-flash::thinking';
+export async function setCopilotUtilityModel(slot: 'primary' | 'small'): Promise<void> {
+  const recommendedId = slot === 'small' ? 'deepseek-v4-flash' : 'deepseek-v4-flash::thinking';
 
   const items = MODELS.map((m) => ({
     label: m.name,
     description: m.id,
-    detail: m.detail,
+    detail: `${m.detailPrefix} · ${priceHint(m.family)}`,
     modelId: m.id,
     picked: m.id === recommendedId,
   }));
@@ -32,7 +30,9 @@ export async function setCopilotUtilityModel(
   // Surface Flash first — it's the right choice for utility flows almost
   // always. Pro stays selectable for users who want the strongest model
   // behind summaries and intent detection.
-  items.sort((a, b) => (a.modelId.includes('flash') ? -1 : 1) - (b.modelId.includes('flash') ? -1 : 1));
+  items.sort(
+    (a, b) => (a.modelId.includes('flash') ? -1 : 1) - (b.modelId.includes('flash') ? -1 : 1),
+  );
 
   const picked = await vscode.window.showQuickPick(items, {
     title:
@@ -59,21 +59,30 @@ export async function setCopilotUtilityModel(
       .getConfiguration()
       .update(targetSetting, value, vscode.ConfigurationTarget.Global);
     logger.info(`Set ${targetSetting}=${value}`);
-    void vscode.window.showInformationMessage(
-      vscode.l10n.t('{0} model set to {1}.', slot === 'small' ? 'Utility Small' : 'Utility', picked.label),
-      vscode.l10n.t('Open Setting'),
-    ).then((choice) => {
-      if (choice === vscode.l10n.t('Open Setting')) {
-        void vscode.commands.executeCommand(
-          'workbench.action.openSettings',
-          `@id:${targetSetting}`,
-        );
-      }
-    });
+    void vscode.window
+      .showInformationMessage(
+        vscode.l10n.t(
+          '{0} model set to {1}.',
+          slot === 'small' ? 'Utility Small' : 'Utility',
+          picked.label,
+        ),
+        vscode.l10n.t('Open Setting'),
+      )
+      .then((choice) => {
+        if (choice === vscode.l10n.t('Open Setting')) {
+          void vscode.commands.executeCommand(
+            'workbench.action.openSettings',
+            `@id:${targetSetting}`,
+          );
+        }
+      });
   } catch (e) {
     logger.error(`Failed to set ${targetSetting}`, e);
     void vscode.window.showErrorMessage(
-      vscode.l10n.t('Failed to set Copilot utility model: {0}', e instanceof Error ? e.message : String(e)),
+      vscode.l10n.t(
+        'Failed to set Copilot utility model: {0}',
+        e instanceof Error ? e.message : String(e),
+      ),
     );
   }
 }

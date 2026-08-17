@@ -1,6 +1,7 @@
 import vscode from 'vscode';
 import { getReasoningEffort, type ReasoningEffort } from '../config';
-import { MAX_TOOLS_PER_REQUEST, MODELS, priceFields } from '../consts';
+import { MAX_TOOLS_PER_REQUEST, MODELS } from '../consts';
+import { PEAK_WINDOW_DESCRIPTION, priceFields, priceHint } from '../pricing';
 
 export type ModelConfigurationOptions = vscode.ProvideLanguageModelChatResponseOptions & {
   readonly modelConfiguration?: Record<string, unknown>;
@@ -33,8 +34,15 @@ export function toChatInfo(
   model: (typeof MODELS)[number],
   hasKey: boolean,
 ): vscode.LanguageModelChatInformation {
+  // Priced at display time, not module load: DeepSeek's peak and off-peak rates
+  // differ by 2x, and the host re-queries this per picker open, so quoting the
+  // rate in force now (with its tier named) beats a number that silently goes
+  // stale when the window rolls over.
+  const now = new Date();
+  const rate = priceHint(model.family, now);
+
   const tooltip = hasKey
-    ? `${model.description}\n\nContext: ${formatTokens(model.maxInputTokens)} in / ${formatTokens(model.maxOutputTokens)} out`
+    ? `${model.description}\n\nContext: ${formatTokens(model.maxInputTokens)} in / ${formatTokens(model.maxOutputTokens)} out\nRate: ${rate} (peak ${PEAK_WINDOW_DESCRIPTION}; off-peak is half price)`
     : API_KEY_REQUIRED_DETAIL;
 
   const statusIcon = !hasKey
@@ -48,7 +56,7 @@ export function toChatInfo(
     name: model.name,
     family: model.family,
     version: model.version,
-    detail: hasKey ? model.detail : API_KEY_REQUIRED_DETAIL,
+    detail: hasKey ? `${model.detailPrefix} · ${rate}` : API_KEY_REQUIRED_DETAIL,
     tooltip,
     maxInputTokens: model.maxInputTokens,
     maxOutputTokens: model.maxOutputTokens,
@@ -65,7 +73,7 @@ export function toChatInfo(
     // Non-public cost fields so DeepSeek's prices surface in Copilot's native
     // picker cost slots. Hosts that don't read them ignore them; the `detail`
     // string carries the same numbers as a visible fallback.
-    ...(hasKey ? priceFields(model.family) : {}),
+    ...(hasKey ? priceFields(model.family, now) : {}),
     ...(model.thinking ? { configurationSchema: buildThinkingEffortSchema() } : {}),
   };
 
@@ -76,13 +84,14 @@ export function getConfiguredThinkingEffort(options: ModelConfigurationOptions):
   const configuredEffort =
     options.modelConfiguration?.reasoningEffort ?? options.configuration?.reasoningEffort;
 
-  // Per DeepSeek thinking_mode docs: `low` and `medium` are mapped to `high`,
-  // and `xhigh` is mapped to `max` for forward/backward compatibility with
-  // other vendors' effort taxonomies (OpenAI, Anthropic, etc).
+  // DeepSeek V4 accepts `low` | `high` | `max` (API default `high`). `medium`
+  // and `xhigh` belong to other vendors' taxonomies (OpenAI, Anthropic) and are
+  // not DeepSeek values, so they map to the nearest real level instead of being
+  // passed through — `xhigh` → `max` matches the mapping DeepSeek publishes for
+  // its own Oh My Pi integration.
   if (configuredEffort === 'max' || configuredEffort === 'xhigh') return 'max';
-  if (configuredEffort === 'high' || configuredEffort === 'medium' || configuredEffort === 'low') {
-    return 'high';
-  }
+  if (configuredEffort === 'high' || configuredEffort === 'medium') return 'high';
+  if (configuredEffort === 'low') return 'low';
   return getReasoningEffort();
 }
 
@@ -92,10 +101,11 @@ function buildThinkingEffortSchema() {
       reasoningEffort: {
         type: 'string',
         title: 'Thinking Effort',
-        enum: ['high', 'max'],
-        enumItemLabels: ['High', 'Max'],
+        enum: ['low', 'high', 'max'],
+        enumItemLabels: ['Low', 'High', 'Max'],
         enumDescriptions: [
-          'Faster responses with shorter reasoning chains.',
+          'Lightest reasoning; fastest and cheapest.',
+          'Shorter reasoning chains; the DeepSeek default.',
           'Maximum reasoning depth; slower and uses more tokens.',
         ],
         default: 'max',

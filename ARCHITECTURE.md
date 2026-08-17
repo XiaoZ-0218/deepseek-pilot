@@ -16,6 +16,7 @@ src/
 ├── auth.ts               # API key storage via secrets API + validation
 ├── config.ts             # Workspace configuration readers
 ├── consts.ts             # Model definitions, MIME constants, IDs, utility-model setting keys
+├── pricing.ts            # Peak/off-peak rate table, tier resolution, picker price strings
 ├── json.ts               # tryParseJson, safeJsonStringify
 ├── logger.ts             # Output channel logger (debug gated by setting)
 ├── types.ts              # OpenAI/DeepSeek API types (DSBalance, DSUsage, etc.)
@@ -86,7 +87,15 @@ Copilot Chat fires many small auxiliary requests against the active model — ch
 
 DeepSeek V4 exposes a **1M-token shared window** (input + output ≤ 1,048,576) with a 384K max-output ceiling, per [the pricing page](https://api-docs.deepseek.com/quick_start/pricing). The thinking variants reserve the full 393,216-token output so a long reasoning chain can't be silently truncated (leaving 655,360 input); the non-thinking variants reserve 64K and keep 983,040 for input. Both API models are `deepseek-v4-pro` / `deepseek-v4-flash` (sent via `getApiModelId`); the legacy `deepseek-chat` / `deepseek-reasoner` IDs were retired on 2026-07-24, so the V4 IDs are the only ones that resolve.
 
-All four variants share `category: { label: 'DeepSeek V4' }` so they appear under one collapsible row in the model picker. Each declares `capabilities: { imageInput: true, toolCalling: 128 }` (128 = `MAX_TOOLS_PER_REQUEST` in [consts.ts](src/consts.ts) — matches the DeepSeek API cap). Thinking variants additionally expose a `configurationSchema` for the per-model "Thinking Effort" picker (`high` / `max`). Each also carries non-public `inputCost` / `outputCost` / `cacheCost` strings (from `priceFields` in [consts.ts](src/consts.ts)) so DeepSeek's prices render in Copilot's native cost slots; hosts that don't read them ignore them, and the `detail` string carries the same numbers as a visible fallback.
+All four variants share `category: { label: 'DeepSeek V4' }` so they appear under one collapsible row in the model picker. Each declares `capabilities: { imageInput: true, toolCalling: 128 }` (128 = `MAX_TOOLS_PER_REQUEST` in [consts.ts](src/consts.ts) — matches the DeepSeek API cap). Thinking variants additionally expose a `configurationSchema` for the per-model "Thinking Effort" picker (`low` / `high` / `max` — the three values DeepSeek V4's `reasoning_effort` accepts, of which `high` is the API default). Each also carries non-public `inputCost` / `outputCost` / `cacheCost` strings (from `priceFields` in [pricing.ts](src/pricing.ts)) so DeepSeek's prices render in Copilot's native cost slots; hosts that don't read them ignore them, and the `detail` string carries the same numbers as a visible fallback.
+
+### Peak / Off-Peak Pricing
+
+[pricing.ts](src/pricing.ts) is the single source of truth for rates — both the picker hints and `BalanceTracker`'s cost estimate read it. Since **2026-08-16 16:00 UTC** DeepSeek bills on a time-of-day schedule: peak is 01:00-04:00 and 06:00-10:00 UTC (the zh-cn page states the identical window as 09:00-12:00 / 14:00-18:00 Beijing time), and every other hour is off-peak at exactly half the peak rate. Note that 04:00-06:00 UTC falls *between* the two peak windows and is off-peak.
+
+Only the peak column is stored; off-peak is derived by halving, which is lossless in binary floating point and matches the published off-peak column cell-for-cell. Because the two tiers differ by 2x, prices are resolved at display time rather than at module load — `toChatInfo` stamps the rate in force on each picker query and names the tier in both the `detail` line and the tooltip, so a long-running window can't keep quoting a stale number. `MODELS` therefore carries a static `detailPrefix` ("Pro · thinking") and the rate is appended live.
+
+This replaced the flat rate card the extension shipped through v0.4.3. The peak/off-peak switch was a genuine price increase, not a relabelled discount — the off-peak column sits above every previous rate — so no fallback to the old figures is kept.
 
 ## Build & Package
 
@@ -144,7 +153,7 @@ The extension's `BalanceTracker` status bar widget is still the home for the Dee
 ### Adding a new DeepSeek model variant
 
 1. Add entry to `MODELS` array in `consts.ts`
-2. Add pricing tier in `balance.ts` → `PRICING` object
+2. Add the family to `PEAK_RATES` (both currencies) and `resolveFamily` in `pricing.ts`
 3. Model picker auto-discovers from `provideLanguageModelChatInformation`
 
 ### Changing token estimation

@@ -20,50 +20,18 @@ export const USAGE_MIME_TYPE = 'usage';
 export const MAX_TOOLS_PER_REQUEST = 128;
 
 /**
- * Per-million-token pricing (USD) for the model-picker `detail` hint and the
- * native cost fields only — `input` is the cache-miss rate, `output` the
- * completion rate. These mirror the cache-miss/output columns of the PRICING
- * table in balance.ts (the source of truth for cost computation). Current as
- * of DeepSeek V4 (https://api-docs.deepseek.com/quick_start/pricing): Pro
- * $0.435/$0.87, Flash $0.14/$0.28 per Mtok. Pro's permanent 75%-off rate is
- * already baked in here — the earlier $1.74/$3.48 figure was the pre-discount
- * price and made the picker overstate Pro's cost 4x.
+ * `detailPrefix` is the static half of the picker's `detail` line; the live
+ * per-Mtok rate is appended at display time (see `toChatInfo`), because
+ * DeepSeek's peak and off-peak rates differ by 2x and a string baked in at
+ * module load would go stale in a long-running window. Pricing itself lives in
+ * [pricing.ts](src/pricing.ts).
  */
-const PRICE_USD = {
-  pro: { input: 0.435, output: 0.87, cacheHit: 0.003625 },
-  flash: { input: 0.14, output: 0.28, cacheHit: 0.0028 },
-} as const;
-
-function priceHint(family: 'pro' | 'flash'): string {
-  const p = PRICE_USD[family];
-  return `$${p.input}/$${p.output} per Mtok in/out`;
-}
-
-/**
- * Per-Mtok cost strings for the (non-public) native cost fields Copilot Chat
- * renders in the model picker. Best-effort: hosts that don't recognise the
- * fields ignore them, and the `detail` string carries the same numbers as a
- * fallback. `cacheCost` is the cache-hit input rate.
- */
-export function priceFields(family: 'deepseek-v4-pro' | 'deepseek-v4-flash'): {
-  inputCost: string;
-  outputCost: string;
-  cacheCost: string;
-} {
-  const p = PRICE_USD[family === 'deepseek-v4-flash' ? 'flash' : 'pro'];
-  return {
-    inputCost: `$${p.input}`,
-    outputCost: `$${p.output}`,
-    cacheCost: `$${p.cacheHit}`,
-  };
-}
-
 export const MODELS = [
   {
     id: 'deepseek-v4-pro::thinking',
     name: 'DeepSeek V4 Pro (thinking)',
     description: 'DeepSeek V4 Pro — strongest, extended thinking, 1M context',
-    detail: `Pro · thinking · ${priceHint('pro')}`,
+    detailPrefix: 'Pro · thinking',
     vendor: 'deepseek-pilot',
     family: 'deepseek-v4-pro',
     version: 'thinking',
@@ -75,7 +43,7 @@ export const MODELS = [
     id: 'deepseek-v4-pro',
     name: 'DeepSeek V4 Pro',
     description: 'DeepSeek V4 Pro — strong, no extended thinking, lower latency',
-    detail: `Pro · fast · ${priceHint('pro')}`,
+    detailPrefix: 'Pro · fast',
     vendor: 'deepseek-pilot',
     family: 'deepseek-v4-pro',
     version: 'default',
@@ -87,7 +55,7 @@ export const MODELS = [
     id: 'deepseek-v4-flash::thinking',
     name: 'DeepSeek V4 Flash (thinking)',
     description: 'DeepSeek V4 Flash — cheapest with extended thinking',
-    detail: `Flash · thinking · ${priceHint('flash')}`,
+    detailPrefix: 'Flash · thinking',
     vendor: 'deepseek-pilot',
     family: 'deepseek-v4-flash',
     version: 'thinking',
@@ -99,7 +67,7 @@ export const MODELS = [
     id: 'deepseek-v4-flash',
     name: 'DeepSeek V4 Flash',
     description: 'DeepSeek V4 Flash — cheapest, no extended thinking',
-    detail: `Flash · fast · ${priceHint('flash')}`,
+    detailPrefix: 'Flash · fast',
     vendor: 'deepseek-pilot',
     family: 'deepseek-v4-flash',
     version: 'default',

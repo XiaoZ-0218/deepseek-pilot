@@ -18,10 +18,10 @@ Requires **VS Code 1.120+** and the GitHub Copilot Chat extension.
 ## What you get
 
 - **Everything Copilot does, on DeepSeek** — because this registers as a native Copilot model provider, agent mode, tool calling, MCP servers, custom instructions, and skills all work unchanged. Switch models mid-chat without losing history.
-- **Four model variants in the picker** — Pro and Flash, each with thinking / non-thinking modes, grouped under one **DeepSeek V4** row. Thinking variants expose a per-model **Thinking Effort** (high / max) control.
+- **Four model variants in the picker** — Pro and Flash, each with thinking / non-thinking modes, grouped under one **DeepSeek V4** row. Thinking variants expose a per-model **Thinking Effort** (low / high / max) control.
 - **Drop images into chat with a text-only model** — a vision-capable describer model summarises each attachment so DeepSeek can reason over the content. Descriptions are cached by image hash, so the same screenshot never re-bills.
 - **Live context-window indicator, DeepSeek-aware** — status-bar item showing `% of window used · cache-hit %` with KV-cache-aware guidance ("keep going, your cache is healthy" vs. "compact now"). Configurable thresholds.
-- **Real session cost & platform balance** — token counts, running spend in your account currency (USD / CNY auto-detected from the DeepSeek API), and a one-click balance refresh. Pricing matches DeepSeek's permanent V4-Pro 75%-off + 1/10 cache-hit rates (announced 2026-05-22).
+- **Real session cost & platform balance** — token counts, running spend in your account currency (USD / CNY auto-detected from the DeepSeek API), and a one-click balance refresh. **Peak/off-peak aware:** DeepSeek has billed on a time-of-day schedule since 2026-08-16 (peak 01:00-04:00 and 06:00-10:00 UTC, off-peak at half price), so both the cost estimate and the model picker quote the rate actually in force and name the tier.
 - **Persistent reasoning cache** — reasoning traces from thinking variants are fingerprinted, persisted across VS Code restarts, and replayed during multi-turn agent loops so DeepSeek's KV cache stays warm.
 - **Wire as Copilot's utility + utility-small models** — two one-click commands route Copilot's background flows (chat titles, summaries, commit messages, intent detection — plus the lightweight fast-path slot Copilot Chat 1.121 exposes) through DeepSeek Flash, where the dollar cost is negligible.
 - **Production-grade request pipeline** — schema sanitisation, tool-call / tool-result pairing, mid-stream truncation detection, retry on transient failures, automatic thinking-off for Copilot's background utility requests (titles, commit messages) so reasoning tokens aren't spent on them, and debug-only cache-trace snapshots for diagnosing odd 400s without leaking message content.
@@ -88,7 +88,7 @@ mklink /D %USERPROFILE%\.vscode\extensions\konstantyn-ganenkov.deepseek-pilot-<v
 
 All four variants remain visible in the Copilot Chat model picker.
 
-- Thinking variants expose a per-model `Thinking Effort` control with `high` and `max`.
+- Thinking variants expose a per-model `Thinking Effort` control with `low`, `high`, and `max`.
 - If the provider is visible but not fully configured yet, use `Manage Provider` from the picker or command palette.
 
 ## Status Bar
@@ -104,7 +104,7 @@ $(sparkle) DeepSeek Pilot · 16% ctx · $0.15  $17.07
 - **`$0.15`** is the running session cost.
 - **`$17.07`** is the platform balance after a refresh.
 - **Click** opens the Manage Provider quick pick (set key, refresh balance, context details, cache stats, logs, settings).
-- **Hover** shows the full breakdown: model, cache hit %, last turn details, situation-specific compaction advice, session totals, balance, reasoning effort, and the KV-cache primer.
+- **Hover** shows the full breakdown: model, cache hit %, last turn details, situation-specific compaction advice, whether DeepSeek's peak or off-peak rate is currently in force, session totals, balance, reasoning effort, and the KV-cache primer.
 
 ## When to compact your chat (DeepSeek-specific)
 

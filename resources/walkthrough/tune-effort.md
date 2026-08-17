@@ -1,8 +1,9 @@
 # Tune Thinking Effort
 
-`(thinking)` variants support two effort levels:
+`(thinking)` variants support three effort levels:
 
-- `high`: Faster answers, lower cost, shorter reasoning chains
+- `low`: Lightest reasoning, fastest answers, lowest cost
+- `high`: Shorter reasoning chains — the level DeepSeek itself defaults to
 - `max`: Deepest reasoning, slower responses, higher token usage
 
 You can set the default in Settings with `deepseek-pilot.reasoningEffort`.

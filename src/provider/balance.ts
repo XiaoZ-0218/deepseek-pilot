@@ -1,38 +1,16 @@
 import vscode from 'vscode';
 import type { DSBalance, DSUsage } from '../types';
 import { getApiUrl, getReasoningEffort } from '../config';
+import {
+  PEAK_WINDOW_DESCRIPTION,
+  getRateTier,
+  getRates,
+  resolveFamily,
+  type PricingCurrency,
+} from '../pricing';
 import { logger } from '../logger';
 import type { ContextWindowTracker } from './context-window';
 import { kvCachePrimerMarkdown } from './context-window';
-
-/**
- * Per-million-token pricing baked in from
- * https://api-docs.deepseek.com/quick_start/pricing. Two DeepSeek-side
- * changes between v0.2.1 and v0.2.2 the numbers below already reflect:
- *   1. **2026-04-26 12:15 UTC** — cache-hit input price for ALL models
- *      dropped to 1/10 of cache-miss (was 1/12 historically for Pro).
- *   2. **2026-05-22** — DeepSeek announced the previously-promotional
- *      V4-Pro 75%-off pricing is now PERMANENT
- *      (https://x.com/deepseek_ai/status/... — confirmed by Bloomberg,
- *      Engadget, the-decoder, DataConomy). The pricing page still has
- *      the stale "promo ends 2026-05-31" wording but lists the post-promo
- *      rate as 1/4 of original, i.e. unchanged. The `applyProDiscount`
- *      opt-in is therefore gone.
- * So Pro = (original × 0.25) for miss/output and (original × 0.025) for
- * hit; Flash = unchanged miss/output, hit dropped to 1/10 of miss.
- */
-const PRICING = {
-  USD: {
-    'deepseek-v4-pro': { cacheHit: 0.003625, cacheMiss: 0.435, output: 0.87 },
-    'deepseek-v4-flash': { cacheHit: 0.0028, cacheMiss: 0.14, output: 0.28 },
-  },
-  CNY: {
-    'deepseek-v4-pro': { cacheHit: 0.025, cacheMiss: 3.0, output: 6.0 },
-    'deepseek-v4-flash': { cacheHit: 0.02, cacheMiss: 1.0, output: 2.0 },
-  },
-} as const;
-
-type PricingCurrency = keyof typeof PRICING;
 
 /** Approximate USD↔CNY conversion rate, used to convert a previously
  * accumulated session total when the account currency is discovered. */
@@ -106,8 +84,7 @@ export class BalanceTracker {
   recordUsage(model: string, usage: DSUsage): void {
     const promptTokens = usage.prompt_tokens ?? 0;
     const cacheHit = usage.prompt_cache_hit_tokens ?? 0;
-    const cacheMiss =
-      usage.prompt_cache_miss_tokens ?? Math.max(0, promptTokens - cacheHit);
+    const cacheMiss = usage.prompt_cache_miss_tokens ?? Math.max(0, promptTokens - cacheHit);
     const completion = usage.completion_tokens ?? 0;
     const reasoning = usage.completion_tokens_details?.reasoning_tokens ?? 0;
 
@@ -118,25 +95,24 @@ export class BalanceTracker {
     this.session.reasoningTokens += reasoning;
     this.session.requestCount += 1;
 
-    const pricing = this.getPricing(model);
+    // Priced at the moment the usage chunk lands, which is when DeepSeek billed
+    // it. A request straddling a peak boundary is settled by DeepSeek's own
+    // accounting — we can't see which side it fell on, so this stays an estimate.
+    const tier = getRateTier();
+    const rates = getRates(resolveFamily(model), this.session.currency);
     const cost =
-      (cacheMiss / 1_000_000) * pricing.cacheMiss +
-      (cacheHit / 1_000_000) * pricing.cacheHit +
-      (completion / 1_000_000) * pricing.output;
+      (cacheMiss / 1_000_000) * rates.cacheMiss +
+      (cacheHit / 1_000_000) * rates.cacheHit +
+      (completion / 1_000_000) * rates.output;
 
     this.session.estimatedCost += cost;
 
     logger.info(
-      `usage prompt=${promptTokens} hit=${cacheHit} miss=${cacheMiss} out=${completion} reasoning=${reasoning} cost=${cost.toFixed(6)} ${this.session.currency} total=${this.session.estimatedCost.toFixed(4)}`,
+      `usage prompt=${promptTokens} hit=${cacheHit} miss=${cacheMiss} out=${completion} reasoning=${reasoning} rate=${tier} cost=${cost.toFixed(6)} ${this.session.currency} total=${this.session.estimatedCost.toFixed(4)}`,
     );
 
     this.updateStatusBar();
     this.scheduleSilentBalanceRefresh();
-  }
-
-  private getPricing(model: string) {
-    const tier = PRICING[this.session.currency];
-    return tier[model as keyof typeof tier] ?? tier['deepseek-v4-pro'];
   }
 
   async refreshBalance(silent = false): Promise<void> {
@@ -144,7 +120,9 @@ export class BalanceTracker {
     if (!apiKey) {
       if (!silent) {
         vscode.window.showWarningMessage(
-          vscode.l10n.t('Set your DeepSeek API key first (Command Palette → DeepSeek Pilot: Set API Key).'),
+          vscode.l10n.t(
+            'Set your DeepSeek API key first (Command Palette → DeepSeek Pilot: Set API Key).',
+          ),
         );
       }
       return;
@@ -162,7 +140,9 @@ export class BalanceTracker {
         const text = await res.text().catch(() => '');
         logger.warn(`Balance fetch failed: ${res.status} ${text.slice(0, 200)}`);
         if (!silent) {
-          vscode.window.showWarningMessage(vscode.l10n.t('Failed to fetch balance: HTTP {0}', String(res.status)));
+          vscode.window.showWarningMessage(
+            vscode.l10n.t('Failed to fetch balance: HTTP {0}', String(res.status)),
+          );
         }
         return;
       }
@@ -183,7 +163,9 @@ export class BalanceTracker {
       const info = data.balance_infos?.[0];
       if (!info) {
         if (!silent) {
-          vscode.window.showWarningMessage(vscode.l10n.t('DeepSeek returned an empty balance response.'));
+          vscode.window.showWarningMessage(
+            vscode.l10n.t('DeepSeek returned an empty balance response.'),
+          );
         }
         return;
       }
@@ -226,7 +208,10 @@ export class BalanceTracker {
       logger.warn('Balance fetch error', e);
       if (!silent) {
         vscode.window.showErrorMessage(
-          vscode.l10n.t('Failed to refresh DeepSeek balance: {0}', e instanceof Error ? e.message : String(e)),
+          vscode.l10n.t(
+            'Failed to refresh DeepSeek balance: {0}',
+            e instanceof Error ? e.message : String(e),
+          ),
         );
       }
     }
@@ -335,6 +320,9 @@ export class BalanceTracker {
       this.session.promptTokens > 0
         ? (this.session.cacheHitTokens / this.session.promptTokens) * 100
         : 0;
+    md.appendMarkdown(
+      `**Rate** &nbsp; \`${getRateTier()}\` &nbsp; _(peak ${PEAK_WINDOW_DESCRIPTION}; off-peak is half price)_\n\n`,
+    );
     md.appendMarkdown(`**Session** &nbsp; \`${this.session.requestCount} requests\`\n\n`);
     md.appendMarkdown(
       `- Prompt tokens: ${this.session.promptTokens.toLocaleString()} ` +

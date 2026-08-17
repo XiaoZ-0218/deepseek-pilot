@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MODELS, priceFields } from '../src/consts';
+import { MODELS } from '../src/consts';
 
 describe('MODELS', () => {
   it('exposes the four DeepSeek V4 variants at the documented 1M / 384K sizes', () => {
@@ -31,22 +31,11 @@ describe('MODELS', () => {
       expect(m.maxInputTokens + m.maxOutputTokens).toBeLessThanOrEqual(1_048_576);
     }
   });
-});
 
-describe('priceFields', () => {
-  it('reports the current Pro price, not the stale pre-discount 4x figure', () => {
-    expect(priceFields('deepseek-v4-pro')).toEqual({
-      inputCost: '$0.435',
-      outputCost: '$0.87',
-      cacheCost: '$0.003625',
-    });
-  });
-
-  it('reports Flash pricing', () => {
-    expect(priceFields('deepseek-v4-flash')).toEqual({
-      inputCost: '$0.14',
-      outputCost: '$0.28',
-      cacheCost: '$0.0028',
-    });
+  it('carries a static detail prefix, leaving the rate to be appended live', () => {
+    for (const m of MODELS) {
+      expect(m.detailPrefix).not.toContain('$');
+      expect(m.detailPrefix).toMatch(/^(Pro|Flash) · (thinking|fast)$/);
+    }
   });
 });
