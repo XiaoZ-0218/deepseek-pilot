@@ -63,7 +63,7 @@
   "Set Copilot Utility Model (used for titles, summaries, commits, intent)": "设置 Copilot 主效用模型（用于标题、摘要、提交信息、意图识别）",
   "Set Copilot Utility Small Model (used for fast, lightweight flows)": "设置 Copilot 轻量效用模型（用于快速、轻量级流程）",
   "Currently selected": "当前已选中",
-  "No vision-capable models found. Sign in to GitHub Copilot Chat to enable vision proxy.": "未找到支持视觉的模型。请登录 GitHub Copilot Chat 以启用视觉代理。",
   "Pick a model to describe images before sending them to DeepSeek": "选择一个模型来在发送给 DeepSeek 之前描述图像",
-  "Vision proxy model set to: {0}": "视觉代理模型已设置为：{0}"
+  "Vision proxy model set to: {0}": "视觉代理模型已设置为：{0}",
+  "DeepSeek built-in vision model (default, uses your DeepSeek API key)": "DeepSeek 内置视觉模型（默认，使用你的 DeepSeek API 密钥）"
 }

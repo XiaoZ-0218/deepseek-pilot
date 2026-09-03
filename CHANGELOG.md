@@ -2,6 +2,21 @@
 
 All notable changes to **DeepSeek Pilot** are recorded here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] — 2026-09-03
+
+DeepSeek released its first multimodal model, **`deepseek-v4-flash-vision-exp`**, on 2026-08-21 ([release note](https://api-docs.deepseek.com/news/news260821)) — four days after v0.5.0 shipped. This release adopts it on both fronts: as a pair of picker variants that read images natively, and as the new zero-config default for the vision proxy that serves the text-only variants. Pricing, model IDs, effort levels, and context limits were re-verified against the live docs on 2026-09-03 and are unchanged.
+
+### Added
+- **Two native-vision picker variants** — `DeepSeek V4 Flash Vision` and `DeepSeek V4 Flash Vision (thinking)`. Image attachments are sent to DeepSeek inline (base64 `image_url` content parts) instead of being paraphrased by a describer model, so the model sees the actual pixels. Billed at Flash rates; DeepSeek converts each image to at most 384 tokens. Both variants join the existing four under the **DeepSeek V4** picker row with an eye icon. DeepSeek labels the model experimental, and the variant descriptions say so.
+- **The vision proxy is now zero-config.** With no `deepseek-pilot.visionModel` configured, image descriptions for the text-only Pro/Flash variants are produced by DeepSeek's own vision model over your existing API key — no second provider, no host model lookup, and no `vscode.lm` consent dialog. A configured setting still wins, and the old auto-detection of a non-DeepSeek host model remains as the final fallback. The `Set Vision Proxy Model` picker gains a **DeepSeek built-in** entry at the top.
+- Native-vision guard rails: images are only sent in user messages (the API 400s on any other role), and an image whose base64 form would exceed DeepSeek's 32 MiB per-image cap is dropped with a logged warning instead of failing the whole request.
+- Token estimates for the vision variants count each image at the API's 384-token cap, so the context-window indicator and prompt budgeting stay honest for image-heavy chats.
+- 8 specs covering the native-vision message conversion and the vision model's Flash-rate billing. The suite is now 56.
+
+### Changed
+- The `deepseek-pilot.modelIdOverrides` setting gains a `deepseek-v4-flash-vision-exp` slot for proxy endpoints that remap the vision model.
+- The README/Marketplace framing no longer describes DeepSeek as text-only — it hasn't been since 2026-08-21.
+
 ## [0.5.0] — 2026-08-17
 
 Re-verification pass against the live DeepSeek V4 API ([pricing](https://api-docs.deepseek.com/quick_start/pricing), its [zh-cn counterpart](https://api-docs.deepseek.com/zh-cn/quick_start/pricing), and the [change log](https://api-docs.deepseek.com/updates), all read 2026-08-17). DeepSeek moved to peak/off-peak billing on **2026-08-16 16:00 UTC** and added a third reasoning-effort level when V4-Pro went GA on **2026-08-13**; both landed after the v0.4.3 check on 2026-07-25. Model IDs, the 1M-token shared window, and the 384K output ceiling are confirmed unchanged.

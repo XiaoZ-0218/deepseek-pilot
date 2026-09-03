@@ -1,9 +1,9 @@
 {
   "name": "deepseek-pilot",
   "displayName": "DeepSeek Pilot — Vision + Token Tracking",
-  "description": "DeepSeek V4 Pro & Flash in GitHub Copilot Chat. Vision proxy for image attachments, KV-cache-aware context-window indicator, persistent reasoning cache, live session cost and platform balance in the status bar, a thinking-effort selector per model variant, and one-click wiring as Copilot's utility/utility-small model.",
+  "description": "DeepSeek V4 Pro, Flash & Flash Vision in GitHub Copilot Chat. Native image input on the vision model plus a zero-config vision proxy for the text-only variants, KV-cache-aware context-window indicator, persistent reasoning cache, live session cost and platform balance in the status bar, a thinking-effort selector per model variant, and one-click wiring as Copilot's utility/utility-small model.",
   "icon": "resources/icon.png",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "publisher": "konstantyn-ganenkov",
   "license": "MIT",
   "repository": {
@@ -157,7 +157,8 @@
           "type": "object",
           "default": {
             "deepseek-v4-flash": "deepseek-v4-flash",
-            "deepseek-v4-pro": "deepseek-v4-pro"
+            "deepseek-v4-pro": "deepseek-v4-pro",
+            "deepseek-v4-flash-vision-exp": "deepseek-v4-flash-vision-exp"
           },
           "description": "%deepseek-pilot.config.modelIdOverrides%",
           "additionalProperties": false,
@@ -169,6 +170,10 @@
             "deepseek-v4-pro": {
               "type": "string",
               "description": "%deepseek-pilot.config.modelIdOverrides.pro%"
+            },
+            "deepseek-v4-flash-vision-exp": {
+              "type": "string",
+              "description": "%deepseek-pilot.config.modelIdOverrides.flashVision%"
             }
           }
         },

@@ -112,6 +112,13 @@ describe('resolveFamily', () => {
     expect(resolveFamily('deepseek-v4-pro')).toBe('deepseek-v4-pro');
   });
 
+  it('bills the vision model at Flash rates, per the 2026-08-21 release note', () => {
+    expect(resolveFamily('deepseek-v4-flash-vision-exp')).toBe('deepseek-v4-flash');
+    expect(getRates('deepseek-v4-flash-vision-exp', 'USD', PEAK)).toEqual(
+      getRates('deepseek-v4-flash', 'USD', PEAK),
+    );
+  });
+
   it('falls back to the dearer tier so an untagged request cannot under-report', () => {
     expect(resolveFamily('some-proxy-model')).toBe('deepseek-v4-pro');
   });

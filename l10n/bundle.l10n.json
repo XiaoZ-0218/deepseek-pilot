@@ -63,7 +63,7 @@
   "Set Copilot Utility Model (used for titles, summaries, commits, intent)": "Set Copilot Utility Model (used for titles, summaries, commits, intent)",
   "Set Copilot Utility Small Model (used for fast, lightweight flows)": "Set Copilot Utility Small Model (used for fast, lightweight flows)",
   "Currently selected": "Currently selected",
-  "No vision-capable models found. Sign in to GitHub Copilot Chat to enable vision proxy.": "No vision-capable models found. Sign in to GitHub Copilot Chat to enable vision proxy.",
   "Pick a model to describe images before sending them to DeepSeek": "Pick a model to describe images before sending them to DeepSeek",
-  "Vision proxy model set to: {0}": "Vision proxy model set to: {0}"
+  "Vision proxy model set to: {0}": "Vision proxy model set to: {0}",
+  "DeepSeek built-in vision model (default, uses your DeepSeek API key)": "DeepSeek built-in vision model (default, uses your DeepSeek API key)"
 }

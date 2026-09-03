@@ -2,7 +2,7 @@
 
 **Pick DeepSeek V4 Pro or Flash from the Copilot Chat model picker — and keep everything Copilot already gives you.** Agent mode, tool calling, MCP servers, custom instructions, skills: all of it keeps working, now running on DeepSeek, with your own API key.
 
-DeepSeek's V4 models are dramatically cheaper than the flagships from OpenAI and Anthropic while staying competitive on coding work — and their prefix-cache pricing means a long, stable chat gets *cheaper and faster* as it grows. Copilot Chat ships generic BYOK support; DeepSeek Pilot adds the DeepSeek-specific layer on top: live session cost and platform balance in the status bar, KV-cache-aware compaction guidance, a per-model thinking-effort control, vision attachments routed through a describer model, and one-click wiring as Copilot's hidden utility model.
+DeepSeek's V4 models are dramatically cheaper than the flagships from OpenAI and Anthropic while staying competitive on coding work — and their prefix-cache pricing means a long, stable chat gets *cheaper and faster* as it grows. Copilot Chat ships generic BYOK support; DeepSeek Pilot adds the DeepSeek-specific layer on top: live session cost and platform balance in the status bar, KV-cache-aware compaction guidance, a per-model thinking-effort control, native image input on the Flash Vision variants (with a zero-config vision proxy for the text-only ones), and one-click wiring as Copilot's hidden utility model.
 
 Requires **VS Code 1.120+** and the GitHub Copilot Chat extension.
 
@@ -18,8 +18,9 @@ Requires **VS Code 1.120+** and the GitHub Copilot Chat extension.
 ## What you get
 
 - **Everything Copilot does, on DeepSeek** — because this registers as a native Copilot model provider, agent mode, tool calling, MCP servers, custom instructions, and skills all work unchanged. Switch models mid-chat without losing history.
-- **Four model variants in the picker** — Pro and Flash, each with thinking / non-thinking modes, grouped under one **DeepSeek V4** row. Thinking variants expose a per-model **Thinking Effort** (low / high / max) control.
-- **Drop images into chat with a text-only model** — a vision-capable describer model summarises each attachment so DeepSeek can reason over the content. Descriptions are cached by image hash, so the same screenshot never re-bills.
+- **Six model variants in the picker** — Pro, Flash, and Flash Vision, each with thinking / non-thinking modes, grouped under one **DeepSeek V4** row. Thinking variants expose a per-model **Thinking Effort** (low / high / max) control.
+- **Native image input on the Flash Vision variants** — attachments go to DeepSeek's own multimodal model (`deepseek-v4-flash-vision-exp`, released 2026-08-21) as real pixels, billed at Flash rates and capped at 384 tokens per image. DeepSeek labels the model experimental.
+- **Images work on the text-only variants too, zero-config** — a describer model summarises each attachment so Pro/Flash can reason over the content. By default that describer is DeepSeek's own vision model via your existing API key; point `deepseek-pilot.visionModel` at any host model to override. Descriptions are cached by image hash, so the same screenshot never re-bills.
 - **Live context-window indicator, DeepSeek-aware** — status-bar item showing `% of window used · cache-hit %` with KV-cache-aware guidance ("keep going, your cache is healthy" vs. "compact now"). Configurable thresholds.
 - **Real session cost & platform balance** — token counts, running spend in your account currency (USD / CNY auto-detected from the DeepSeek API), and a one-click balance refresh. **Peak/off-peak aware:** DeepSeek has billed on a time-of-day schedule since 2026-08-16 (peak 01:00-04:00 and 06:00-10:00 UTC, off-peak at half price), so both the cost estimate and the model picker quote the rate actually in force and name the tier.
 - **Persistent reasoning cache** — reasoning traces from thinking variants are fingerprinted, persisted across VS Code restarts, and replayed during multi-turn agent loops so DeepSeek's KV cache stays warm.
@@ -33,7 +34,7 @@ Requires **VS Code 1.120+** and the GitHub Copilot Chat extension.
 | --- | --- | --- | --- |
 | Works inside Copilot Chat | Yes | Yes | No — separate UI |
 | Copilot agent mode, tools, MCP, skills | Yes | Yes | Reimplemented, partial |
-| Vision / image attachments | Yes — proxied | No | No |
+| Vision / image attachments | Yes — native on Flash Vision, proxied on Pro/Flash | No | No |
 | Live cost, balance & cache-hit in the status bar | Yes | No | Varies |
 | KV-cache-aware compaction guidance | Yes | No | No |
 | Per-session spend in your account currency | Yes | No | No |
@@ -86,9 +87,10 @@ mklink /D %USERPROFILE%\.vscode\extensions\konstantyn-ganenkov.deepseek-pilot-<v
 
 ## Model Picker
 
-All four variants remain visible in the Copilot Chat model picker.
+All six variants remain visible in the Copilot Chat model picker.
 
 - Thinking variants expose a per-model `Thinking Effort` control with `low`, `high`, and `max`.
+- The Flash Vision pair reads image attachments natively; the other variants describe them via the vision proxy.
 - If the provider is visible but not fully configured yet, use `Manage Provider` from the picker or command palette.
 
 ## Status Bar
@@ -130,6 +132,7 @@ Adjust thresholds via `deepseek-pilot.contextWarnThreshold` and `deepseek-pilot.
 - `deepseek-pilot.reasoningEffort`: default effort for `(thinking)` variants
 - `deepseek-pilot.optimizeUtilityRequests`: auto-disable thinking on Copilot's background utility requests (titles, commit messages) when a thinking variant is active; default on
 - `deepseek-pilot.modelIdOverrides`: remap API model IDs for DeepSeek-compatible proxy endpoints
+- `deepseek-pilot.visionModel`: describer model for image attachments on the text-only variants; empty (default) = DeepSeek's own vision model via your API key
 - `deepseek-pilot.baseUrl`: switch between DeepSeek and compatible gateways
 - `deepseek-pilot.contextWarnThreshold` / `deepseek-pilot.contextCriticalThreshold`: percent thresholds for the context-window indicator
 - `deepseek-pilot.debug`: emit verbose diagnostics to the **DeepSeek Pilot** output channel

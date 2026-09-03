@@ -75,7 +75,7 @@ export function snapshotCacheTrace(
   const unpairedToolResults: string[] = [];
 
   for (const msg of messages) {
-    const contentChars = msg.content?.length ?? 0;
+    const contentChars = normalizeContent(msg.content).length;
     const reasoningChars = msg.reasoning_content?.length ?? 0;
     stats.totalContentChars += contentChars;
     stats.totalReasoningChars += reasoningChars;
@@ -186,10 +186,24 @@ function roleTag(s: MessageSummary): string {
   return s.role;
 }
 
+/**
+ * Flatten content to a hashable string. Native-vision content arrays collapse
+ * an image to a short length-tagged placeholder — this snapshot runs on every
+ * request (only the LOGGING is debug-gated), so hashing megabytes of base64
+ * per turn is off the table.
+ */
+function normalizeContent(content: OpenAIChatMessage['content']): string {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  return content
+    .map((p) => (p.type === 'text' ? p.text : `[image_url:${p.image_url.url.length}]`))
+    .join('\n');
+}
+
 function hashContent(msg: OpenAIChatMessage): string {
   const normalized = JSON.stringify({
     role: msg.role,
-    content: msg.content ?? '',
+    content: normalizeContent(msg.content),
     tool_calls: (msg.tool_calls ?? []).map((tc) => ({
       id: tc.id,
       name: tc.function.name,

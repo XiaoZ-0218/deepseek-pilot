@@ -6,12 +6,13 @@ Open Copilot Chat (`Ctrl+Shift+I`) and select a model from the picker:
 - **V4 Pro**: Strong, lower latency, no reasoning chain
 - **V4 Flash (thinking)**: Cheap extended thinking for analysis
 - **V4 Flash**: Cheapest, fastest, simple tasks
+- **V4 Flash Vision / (thinking)**: Native image input at Flash pricing (experimental DeepSeek model)
 
 If the provider is present but not fully configured yet, open **DeepSeek Pilot: Manage Provider** from the picker menu or command palette.
 
 Thinking variants also expose a per-model **Thinking Effort** selector with `low`, `high`, and `max`.
 
-**Vision support:** Drop images into chat. The extension automatically proxies them through a vision-capable model, then sends the text description to DeepSeek.
+**Vision support:** Drop images into chat with any variant. The Flash Vision pair reads them natively; on the text-only variants the extension describes each image — by default with DeepSeek's own vision model via your API key — and sends the text description to DeepSeek.
 
 **Use as utility model:** From **Manage Provider**, pick **Use as Copilot Utility Model** (or the *Small* variant) to route Copilot's background flows — titles, summaries, commit messages, intent detection — through DeepSeek Flash. Cheap, fast, no thinking.
 

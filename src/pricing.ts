@@ -19,6 +19,9 @@
  */
 
 export type ModelFamily = 'deepseek-v4-pro' | 'deepseek-v4-flash';
+
+/** Any model identifier accepted by the rate lookups; resolved via `resolveFamily`. */
+export type PriceableModel = ModelFamily | (string & {});
 export type PricingCurrency = 'USD' | 'CNY';
 export type RateTier = 'peak' | 'off-peak';
 
@@ -64,11 +67,11 @@ export function getRateTier(at: Date = new Date()): RateTier {
 }
 
 export function getRates(
-  family: ModelFamily,
+  model: PriceableModel,
   currency: PricingCurrency = 'USD',
   at: Date = new Date(),
 ): Rates {
-  const peak = PEAK_RATES[currency][family];
+  const peak = PEAK_RATES[currency][resolveFamily(model)];
   if (getRateTier(at) === 'peak') return peak;
   return {
     cacheHit: peak.cacheHit * OFF_PEAK_FACTOR,
@@ -79,10 +82,12 @@ export function getRates(
 
 /**
  * An unrecognised model id prices as Pro — the dearer tier — so a request we
- * failed to tag over-reports rather than under-reports spend.
+ * failed to tag over-reports rather than under-reports spend. The prefix match
+ * folds `deepseek-v4-flash-vision-exp` into Flash: DeepSeek bills the vision
+ * model at V4-Flash rates (pricing page, 2026-08-21 release note).
  */
 export function resolveFamily(model: string): ModelFamily {
-  return model === 'deepseek-v4-flash' ? 'deepseek-v4-flash' : 'deepseek-v4-pro';
+  return model.startsWith('deepseek-v4-flash') ? 'deepseek-v4-flash' : 'deepseek-v4-pro';
 }
 
 /** Trims to the pricing page's precision and drops trailing zeros: `0.007`, `1.32`, `27`. */
@@ -96,8 +101,8 @@ function formatRate(n: number): string {
  * wrong for much of the day. `toChatInfo` runs per picker query, so passing the
  * call time through re-evaluates this naturally.
  */
-export function priceHint(family: ModelFamily, at: Date = new Date()): string {
-  const rates = getRates(family, 'USD', at);
+export function priceHint(model: PriceableModel, at: Date = new Date()): string {
+  const rates = getRates(model, 'USD', at);
   return `$${formatRate(rates.cacheMiss)}/$${formatRate(rates.output)} per Mtok in/out · ${getRateTier(at)}`;
 }
 
@@ -108,10 +113,10 @@ export function priceHint(family: ModelFamily, at: Date = new Date()): string {
  * `detail` string. `cacheCost` is the cache-hit input rate.
  */
 export function priceFields(
-  family: ModelFamily,
+  model: PriceableModel,
   at: Date = new Date(),
 ): { inputCost: string; outputCost: string; cacheCost: string } {
-  const rates = getRates(family, 'USD', at);
+  const rates = getRates(model, 'USD', at);
   return {
     inputCost: `$${formatRate(rates.cacheMiss)}`,
     outputCost: `$${formatRate(rates.output)}`,

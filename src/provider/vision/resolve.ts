@@ -7,6 +7,7 @@ import {
   IMAGE_DESCRIPTION_UNAVAILABLE,
 } from '../../consts';
 import { logger } from '../../logger';
+import type { VisionDescriber } from './model';
 
 export interface VisionResolutionResult {
   resolvedMessages: vscode.LanguageModelChatRequestMessage[];
@@ -43,6 +44,11 @@ const visionDescriptionCache = new Map<string, VisionDescriptionCacheEntry>();
 const pendingVisionDescriptions = new Map<string, Promise<string>>();
 /** Secondary index: dataHash → description, used by provideTokenCount when only bytes are known. */
 const dataHashToDescription = new Map<string, string>();
+
+/** Stats stub for request paths that bypass the proxy (native-vision variants). */
+export function disabledVisionStats(): VisionDescriptionCacheStats {
+  return { ...freshStats(), enabled: false };
+}
 
 function freshStats(): VisionDescriptionCacheStats {
   return {
@@ -136,12 +142,13 @@ function hasImageParts(msg: vscode.LanguageModelChatRequestMessage): boolean {
 
 /**
  * Resolve any image parts in user messages by forwarding them to a vision
- * model and replacing them with `[Image Description: ...]` text. This lets
- * text-only DeepSeek effectively "see" images.
+ * describer and replacing them with `[Image Description: ...]` text. This lets
+ * the text-only DeepSeek variants effectively "see" images. (Native-vision
+ * variants skip this entirely — request.ts sends their images inline.)
  */
 export async function resolveImageMessages(
   messages: readonly vscode.LanguageModelChatRequestMessage[],
-  getVisionModel: () => Promise<vscode.LanguageModelChat | null>,
+  getVisionModel: () => Promise<VisionDescriber | null>,
 ): Promise<VisionResolutionResult> {
   const stats = freshStats();
   const anyImages = messages.some(hasImageParts);
@@ -212,7 +219,7 @@ export async function resolveImageMessages(
       } else {
         stats.misses += 1;
         stats.cacheMisses += 1;
-        descPromise = describeImage(part, visionModel, visionPrompt).then(
+        descPromise = visionModel.describe(part, visionPrompt).then(
           (description) => {
             if (description.length > 0) {
               rememberDescription(cacheKey, description, dataHash);
@@ -261,29 +268,4 @@ export async function resolveImageMessages(
 
   stats.entries = visionDescriptionCache.size;
   return { resolvedMessages: result, stats, visionModelId: visionModel.id };
-}
-
-async function describeImage(
-  part: vscode.LanguageModelDataPart,
-  visionModel: vscode.LanguageModelChat,
-  visionPrompt: string,
-): Promise<string> {
-  const visionMessage = vscode.LanguageModelChatMessage.User([
-    part,
-    new vscode.LanguageModelTextPart(visionPrompt),
-  ] as (vscode.LanguageModelDataPart | vscode.LanguageModelTextPart)[]);
-
-  const tokenSource = new vscode.CancellationTokenSource();
-  try {
-    const response = await visionModel.sendRequest([visionMessage], {}, tokenSource.token);
-    let text = '';
-    for await (const chunk of response.stream) {
-      if (chunk instanceof vscode.LanguageModelTextPart) {
-        text += chunk.value;
-      }
-    }
-    return text.trim();
-  } finally {
-    tokenSource.dispose();
-  }
 }

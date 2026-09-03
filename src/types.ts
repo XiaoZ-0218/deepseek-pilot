@@ -1,11 +1,20 @@
 export interface OpenAIChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string | null;
+  content: string | null | OpenAIContentPart[];
   tool_calls?: OpenAIToolCall[];
   tool_call_id?: string;
   name?: string;
   reasoning_content?: string;
 }
+
+/**
+ * Multimodal content part for native-vision models. DeepSeek's vision API only
+ * accepts image parts in `user` messages (anywhere else is a 400), so convert.ts
+ * emits arrays only there and keeps plain strings everywhere else.
+ */
+export type OpenAIContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } };
 
 export interface OpenAIToolCall {
   id: string;

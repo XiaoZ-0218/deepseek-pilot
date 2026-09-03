@@ -3,10 +3,15 @@ import type { OpenAIChatMessage, OpenAIFunctionToolDef } from '../types';
 import type { AuthManager } from '../auth';
 import type { ReasoningCache } from './cache';
 import { convertMessages } from './convert';
-import { resolveImageMessages, type VisionDescriptionCacheStats } from './vision/index';
+import {
+  disabledVisionStats,
+  resolveImageMessages,
+  type VisionDescriber,
+  type VisionDescriptionCacheStats,
+} from './vision/index';
 import { logger } from '../logger';
 import { safeJsonStringify } from '../json';
-import { MODELS } from '../consts';
+import { MODELS, VISION_IMAGE_TOKEN_CAP } from '../consts';
 import {
   getApiModelId,
   getApiUrl,
@@ -48,7 +53,7 @@ export async function prepareChatRequest(params: {
   options: vscode.ProvideLanguageModelChatResponseOptions;
   token: vscode.CancellationToken;
   reasoningCache: ReasoningCache;
-  getVisionModel: () => Promise<vscode.LanguageModelChat | null>;
+  getVisionModel: () => Promise<VisionDescriber | null>;
 }): Promise<PreparedRequest> {
   const { authManager, modelInfo, messages, options, token, reasoningCache, getVisionModel } =
     params;
@@ -66,16 +71,18 @@ export async function prepareChatRequest(params: {
     logger.warn(`Request validation: ${validation}`);
   }
 
-  // Resolve images via vision proxy (drops images if no vision model).
-  const { resolvedMessages, stats: cacheDiagnostics } = await resolveImageMessages(
-    messages,
-    getVisionModel,
-  );
-
-  if (token.isCancellationRequested) throw new vscode.CancellationError();
-
   const variant = MODELS.find((m) => m.id === modelInfo.id);
   if (!variant) throw new Error(`Unknown model: ${modelInfo.id}`);
+
+  // Native-vision variants send images inline (convertMessages builds the
+  // image_url content parts), so the describe-and-replace proxy step is
+  // skipped entirely. Text-only variants resolve images via the vision
+  // describer (drops images if none is available).
+  const { resolvedMessages, stats: cacheDiagnostics } = variant.nativeVision
+    ? { resolvedMessages: [...messages], stats: disabledVisionStats() }
+    : await resolveImageMessages(messages, getVisionModel);
+
+  if (token.isCancellationRequested) throw new vscode.CancellationError();
 
   // A thinking variant normally enables reasoning, but Copilot's lightweight
   // auxiliary flows (chat titles, commit messages, etc.) get no benefit from
@@ -95,7 +102,12 @@ export async function prepareChatRequest(params: {
   //   - enforces tool_call → tool_result ordering
   //   - drops orphan tool_result parts (no matching open tool_call)
   //   - attaches reasoning_content from cache (or "" fallback) on thinking-mode
-  const openaiMessages = convertMessages(resolvedMessages, thinking, reasoningCache);
+  const openaiMessages = convertMessages(
+    resolvedMessages,
+    thinking,
+    reasoningCache,
+    variant.nativeVision,
+  );
 
   if (openaiMessages.length === 0) {
     throw new Error('No messages to send after conversion');
@@ -255,6 +267,23 @@ function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
 }
 
+/**
+ * Character weight of a message's content for the charsPerToken calibration.
+ * Native-vision content arrays count text verbatim; an image counts as its
+ * API-side token cap at ~4 chars/token, NOT its base64 length — the API bills
+ * dimension-derived tokens, so counting megabytes of base64 would wreck the
+ * estimator.
+ */
+function contentChars(content: OpenAIChatMessage['content']): number {
+  if (typeof content === 'string') return content.length;
+  if (!Array.isArray(content)) return 0;
+  let chars = 0;
+  for (const part of content) {
+    chars += part.type === 'text' ? part.text.length : VISION_IMAGE_TOKEN_CAP * 4;
+  }
+  return chars;
+}
+
 function countRequestChars(
   messages: readonly OpenAIChatMessage[],
   tools: readonly OpenAIFunctionToolDef[] | undefined,
@@ -262,7 +291,7 @@ function countRequestChars(
   let totalChars = 0;
 
   for (const message of messages) {
-    totalChars += message.content?.length ?? 0;
+    totalChars += contentChars(message.content);
     totalChars += message.reasoning_content?.length ?? 0;
 
     for (const toolCall of message.tool_calls ?? []) {

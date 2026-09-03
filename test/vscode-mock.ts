@@ -6,6 +6,29 @@ export class LanguageModelTextPart {
   constructor(public readonly value: string) {}
 }
 
+// convert.ts instanceof-checks these three during request preparation.
+export class LanguageModelDataPart {
+  constructor(
+    public readonly data: Uint8Array,
+    public readonly mimeType: string,
+  ) {}
+}
+
+export class LanguageModelToolCallPart {
+  constructor(
+    public readonly callId: string,
+    public readonly name: string,
+    public readonly input: object,
+  ) {}
+}
+
+export class LanguageModelToolResultPart {
+  constructor(
+    public readonly callId: string,
+    public readonly content: unknown[],
+  ) {}
+}
+
 export const LanguageModelChatMessageRole = { User: 1, Assistant: 2 } as const;
 
 // logger.ts constructs its output channel at module scope, so importing any
@@ -27,4 +50,12 @@ export const workspace = {
   getConfiguration: () => ({ get: () => undefined }),
 };
 
-export default { LanguageModelTextPart, LanguageModelChatMessageRole, window, workspace };
+export default {
+  LanguageModelTextPart,
+  LanguageModelDataPart,
+  LanguageModelToolCallPart,
+  LanguageModelToolResultPart,
+  LanguageModelChatMessageRole,
+  window,
+  workspace,
+};

@@ -1,5 +1,9 @@
 import vscode from 'vscode';
-import { IMAGE_DESCRIPTION_PREFIX, IMAGE_DESCRIPTION_SUFFIX } from '../consts';
+import {
+  IMAGE_DESCRIPTION_PREFIX,
+  IMAGE_DESCRIPTION_SUFFIX,
+  VISION_IMAGE_TOKEN_CAP,
+} from '../consts';
 import { computeDataHash, getCachedDescriptionByDataHash } from './vision/resolve';
 
 /**
@@ -9,10 +13,15 @@ import { computeDataHash, getCachedDescriptionByDataHash } from './vision/resolv
  * calls `provideTokenCount` across VS Code's API proxy boundary and parts
  * arrive as plain objects without their class prototype, so `instanceof`
  * checks always fail and every part would otherwise count as 0 tokens.
+ *
+ * `nativeVision`: on the native-vision variants an image is billed by the API
+ * at most VISION_IMAGE_TOKEN_CAP tokens (dimension-derived), so images count
+ * that flat cap instead of a proxy description's length.
  */
 export function estimateTokenCount(
   text: string | vscode.LanguageModelChatRequestMessage,
   charsPerToken: number,
+  nativeVision = false,
 ): number {
   if (typeof text === 'string') {
     return Math.ceil(text.length / charsPerToken);
@@ -21,15 +30,18 @@ export function estimateTokenCount(
   const parts = text.content;
   if (!Array.isArray(parts)) return Math.ceil(String(text.content ?? '').length / charsPerToken);
 
+  // The image chars are chosen so the final division yields the token cap.
+  const nativeImageChars = nativeVision ? VISION_IMAGE_TOKEN_CAP * charsPerToken : undefined;
+
   let chars = 0;
   for (const part of parts) {
-    chars += estimatePartChars(part);
+    chars += estimatePartChars(part, nativeImageChars);
   }
 
   return Math.ceil(chars / charsPerToken);
 }
 
-function estimatePartChars(part: unknown): number {
+function estimatePartChars(part: unknown, nativeImageChars?: number): number {
   if (typeof part === 'string') return part.length;
   if (!part || typeof part !== 'object') return 0;
   const obj = part as Record<string, unknown>;
@@ -37,6 +49,9 @@ function estimatePartChars(part: unknown): number {
   // DataPart: { data: Uint8Array, mimeType: string }
   if (typeof obj.mimeType === 'string' && obj.data) {
     const mime = obj.mimeType;
+    if (mime.startsWith('image/') && nativeImageChars !== undefined) {
+      return nativeImageChars;
+    }
     const data = obj.data as Uint8Array & { byteLength?: number };
     const byteLength = typeof data.byteLength === 'number' ? data.byteLength : 0;
     if (mime.startsWith('image/') && byteLength > 0 && byteLength <= 500_000) {
@@ -55,14 +70,18 @@ function estimatePartChars(part: unknown): number {
   // ToolCallPart: { callId, name, input }
   if (typeof obj.callId === 'string' && typeof obj.name === 'string' && 'input' in obj) {
     let chars = obj.callId.length + obj.name.length;
-    try { chars += JSON.stringify(obj.input).length; } catch { chars += 2; }
+    try {
+      chars += JSON.stringify(obj.input).length;
+    } catch {
+      chars += 2;
+    }
     return chars;
   }
 
   // ToolResultPart: { callId, content: Array<part> }
   if (typeof obj.callId === 'string' && Array.isArray(obj.content)) {
     let chars = obj.callId.length;
-    for (const item of obj.content) chars += estimatePartChars(item);
+    for (const item of obj.content) chars += estimatePartChars(item, nativeImageChars);
     return chars;
   }
 
@@ -73,5 +92,9 @@ function estimatePartChars(part: unknown): number {
 
   // PromptTsxPart and unknown future part shapes — best-effort estimate
   // from JSON serialization so an unrecognized part still contributes.
-  try { return JSON.stringify(obj).length; } catch { return 0; }
+  try {
+    return JSON.stringify(obj).length;
+  } catch {
+    return 0;
+  }
 }

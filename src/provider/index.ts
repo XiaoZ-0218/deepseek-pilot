@@ -21,7 +21,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
   private isActive = true;
   private persistTimer: NodeJS.Timeout | undefined;
   private reasoningCache = new ReasoningCache();
-  private vision = createVisionModelGetter();
+  private vision = createVisionModelGetter({ getApiKey: () => this.authManager.getApiKey() });
   private balanceTracker: BalanceTracker;
   private contextTracker: ContextWindowTracker;
   private charsPerToken = 4.0;
@@ -78,6 +78,9 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
       context.secrets.onDidChange((e) => {
         if (e.key === 'deepseek-pilot.apiKey') {
           this.onDidChangeEmitter.fire();
+          // The vision describer resolution depends on key presence (native
+          // DeepSeek vision needs one) — re-resolve on key changes.
+          this.vision.reset();
           // Try an initial silent balance fetch once a key is available.
           void this.balanceTracker.refreshBalance(true);
         }
@@ -211,18 +214,21 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
    * response instead of an estimate.
    */
   async provideTokenCount(
-    _modelInfo: vscode.LanguageModelChatInformation,
+    modelInfo: vscode.LanguageModelChatInformation,
     text: string | vscode.LanguageModelChatRequestMessage,
     _token: vscode.CancellationToken,
   ): Promise<number> {
-    const count = estimateTokenCount(text, this.charsPerToken);
+    const nativeVision = MODELS.find((m) => m.id === modelInfo.id)?.nativeVision ?? false;
+    const count = estimateTokenCount(text, this.charsPerToken, nativeVision);
     if (!this._tokenCountLogged) {
       this._tokenCountLogged = true;
       const shape =
         typeof text === 'string'
           ? `string(len=${text.length})`
           : `message(parts=${Array.isArray(text.content) ? text.content.length : 'non-array'})`;
-      logger.info(`provideTokenCount first call → ${count} tokens (charsPerToken=${this.charsPerToken.toFixed(1)}, ${shape})`);
+      logger.info(
+        `provideTokenCount first call → ${count} tokens (charsPerToken=${this.charsPerToken.toFixed(1)}, ${shape})`,
+      );
     } else {
       logger.debug(`provideTokenCount → ${count} tokens`);
     }

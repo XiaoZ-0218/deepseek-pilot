@@ -47,9 +47,11 @@ export function toChatInfo(
 
   const statusIcon = !hasKey
     ? new vscode.ThemeIcon('warning')
-    : model.thinking
-      ? new vscode.ThemeIcon('lightbulb-sparkle')
-      : new vscode.ThemeIcon('rocket');
+    : model.nativeVision
+      ? new vscode.ThemeIcon('eye')
+      : model.thinking
+        ? new vscode.ThemeIcon('lightbulb-sparkle')
+        : new vscode.ThemeIcon('rocket');
 
   const info: RuntimeLanguageModelChatInformation = {
     id: model.id,

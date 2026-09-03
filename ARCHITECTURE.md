@@ -2,7 +2,7 @@
 
 ## Overview
 
-VS Code extension that registers DeepSeek V4 models (Pro/Flash × thinking/non-thinking) as `LanguageModelChatProvider` for GitHub Copilot Chat. Merges vision proxy from [deepseek-v4-for-copilot](https://github.com/Vizards/deepseek-v4-for-copilot) and balance/token tracking from [deepseek-v4-vscode-chat](https://github.com/Laurent00TT/deepseek-v4-vscode-chat).
+VS Code extension that registers DeepSeek V4 models (Pro/Flash/Flash Vision × thinking/non-thinking) as `LanguageModelChatProvider` for GitHub Copilot Chat. Merges vision proxy from [deepseek-v4-for-copilot](https://github.com/Vizards/deepseek-v4-for-copilot) and balance/token tracking from [deepseek-v4-vscode-chat](https://github.com/Laurent00TT/deepseek-v4-vscode-chat).
 
 - **Language**: TypeScript 6, target ES2022, NodeNext modules
 - **VS Code API**: `^1.120.0` (uses `LanguageModelChatProvider`, `LanguageModelDataPart`, `chat.utilityModel`, BYOK context window widget)
@@ -56,12 +56,15 @@ However, `convert.ts` and `validate.ts` DO use `instanceof` because they're call
 - Cache hit → reuse original reasoning chain; cache miss → `""` fallback
 - Eviction: oldest-first when >512 entries or >20 MB total
 
-### Vision Proxy
+### Vision: native + proxy
 
-- DeepSeek models are text-only; images are described by a separate vision-capable model
+Two image paths, selected by the variant's `nativeVision` flag in `consts.ts`:
+
+- **Native (Flash Vision variants):** `convert.ts` emits user-message content as an ordered `{type:"text"}` / `{type:"image_url"}` parts array with images inlined as base64 data URLs. The API only accepts images in `user` messages (anywhere else is a 400) and caps a base64 image at 32 MiB, so images in other roles or over ~24 MiB raw are dropped with a logged warning. Each image bills at most 384 tokens (`VISION_IMAGE_TOKEN_CAP`); `tokens.ts` and the request char count use that cap, not the base64 length.
+- **Proxy (text-only Pro/Flash variants):** images are described by a `VisionDescriber` and replaced with `[Image Description: ...]` text. Resolution order in `vision/model.ts`: the `deepseek-pilot.visionModel` setting (a host model) → **DeepSeek's own vision model called directly over the API key** (the zero-config default — no host lookup, no `vscode.lm` consent dialog, thinking disabled) → auto-detect of the first non-DeepSeek host model.
 - Cache: primary by `(mime + dataHash + visionModel + prompt`), secondary by `dataHash`
 - Single-flight deduplication: concurrent same-image lookups share one proxy call
-- `provideTokenCount` reads cached descriptions via `dataHash` to estimate image tokens
+- `provideTokenCount` reads cached descriptions via `dataHash` to estimate image tokens on proxy variants
 
 ### Tool Call Handling
 
@@ -78,16 +81,20 @@ Copilot Chat fires many small auxiliary requests against the active model — ch
 
 ## Model Variants
 
-| ID | maxInputTokens | maxOutputTokens | Thinking |
-| --- | --- | --- | --- |
-| `deepseek-v4-pro::thinking` | 655,360 | 393,216 | yes |
-| `deepseek-v4-pro` | 983,040 | 65,536 | no |
-| `deepseek-v4-flash::thinking` | 655,360 | 393,216 | yes |
-| `deepseek-v4-flash` | 983,040 | 65,536 | no |
+| ID | maxInputTokens | maxOutputTokens | Thinking | Native vision |
+| --- | --- | --- | --- | --- |
+| `deepseek-v4-pro::thinking` | 655,360 | 393,216 | yes | no |
+| `deepseek-v4-pro` | 983,040 | 65,536 | no | no |
+| `deepseek-v4-flash::thinking` | 655,360 | 393,216 | yes | no |
+| `deepseek-v4-flash` | 983,040 | 65,536 | no | no |
+| `deepseek-v4-flash-vision-exp::thinking` | 655,360 | 393,216 | yes | yes |
+| `deepseek-v4-flash-vision-exp` | 983,040 | 65,536 | no | yes |
+
+The Flash Vision pair targets DeepSeek's multimodal `deepseek-v4-flash-vision-exp` (released 2026-08-21, explicitly experimental, billed at Flash rates — `resolveFamily` in [pricing.ts](src/pricing.ts) prefix-matches it into the Flash tier). Same 1M shared window and 384K output ceiling as the rest.
 
 DeepSeek V4 exposes a **1M-token shared window** (input + output ≤ 1,048,576) with a 384K max-output ceiling, per [the pricing page](https://api-docs.deepseek.com/quick_start/pricing). The thinking variants reserve the full 393,216-token output so a long reasoning chain can't be silently truncated (leaving 655,360 input); the non-thinking variants reserve 64K and keep 983,040 for input. Both API models are `deepseek-v4-pro` / `deepseek-v4-flash` (sent via `getApiModelId`); the legacy `deepseek-chat` / `deepseek-reasoner` IDs were retired on 2026-07-24, so the V4 IDs are the only ones that resolve.
 
-All four variants share `category: { label: 'DeepSeek V4' }` so they appear under one collapsible row in the model picker. Each declares `capabilities: { imageInput: true, toolCalling: 128 }` (128 = `MAX_TOOLS_PER_REQUEST` in [consts.ts](src/consts.ts) — matches the DeepSeek API cap). Thinking variants additionally expose a `configurationSchema` for the per-model "Thinking Effort" picker (`low` / `high` / `max` — the three values DeepSeek V4's `reasoning_effort` accepts, of which `high` is the API default). Each also carries non-public `inputCost` / `outputCost` / `cacheCost` strings (from `priceFields` in [pricing.ts](src/pricing.ts)) so DeepSeek's prices render in Copilot's native cost slots; hosts that don't read them ignore them, and the `detail` string carries the same numbers as a visible fallback.
+All six variants share `category: { label: 'DeepSeek V4' }` so they appear under one collapsible row in the model picker. Each declares `capabilities: { imageInput: true, toolCalling: 128 }` (128 = `MAX_TOOLS_PER_REQUEST` in [consts.ts](src/consts.ts) — matches the DeepSeek API cap). Thinking variants additionally expose a `configurationSchema` for the per-model "Thinking Effort" picker (`low` / `high` / `max` — the three values DeepSeek V4's `reasoning_effort` accepts, of which `high` is the API default). Each also carries non-public `inputCost` / `outputCost` / `cacheCost` strings (from `priceFields` in [pricing.ts](src/pricing.ts)) so DeepSeek's prices render in Copilot's native cost slots; hosts that don't read them ignore them, and the `detail` string carries the same numbers as a visible fallback.
 
 ### Peak / Off-Peak Pricing
 
@@ -152,9 +159,10 @@ The extension's `BalanceTracker` status bar widget is still the home for the Dee
 
 ### Adding a new DeepSeek model variant
 
-1. Add entry to `MODELS` array in `consts.ts`
-2. Add the family to `PEAK_RATES` (both currencies) and `resolveFamily` in `pricing.ts`
-3. Model picker auto-discovers from `provideLanguageModelChatInformation`
+1. Add entry to `MODELS` array in `consts.ts` (set `nativeVision` for multimodal models)
+2. Route the family in `resolveFamily` in `pricing.ts`; add a `PEAK_RATES` entry (both currencies) only if it bills at genuinely new rates (the vision model reuses Flash's)
+3. Add a `modelIdOverrides` slot in `package.json` if proxy users may need to remap it
+4. Model picker auto-discovers from `provideLanguageModelChatInformation`
 
 ### Changing token estimation
 
@@ -169,9 +177,13 @@ The extension's `BalanceTracker` status bar widget is still the home for the Dee
 3. Validate with `validate.ts` — checks tool_call / tool_result pairing
 4. Check `sanitize.ts` — malformed function names or unsupported schema keywords
 
-### Testing vision proxy
+### Testing vision
 
-1. Configure a vision-capable model: `DeepSeek Pilot: Set Vision Proxy Model`
-2. Drop an image into Copilot Chat
-3. The image is described by the proxy model, cached, and the description is sent to DeepSeek
+**Native path:** pick a Flash Vision variant, drop an image into Copilot Chat, and confirm the request carries `image_url` content parts (enable `deepseek-pilot.debug` — the cache-trace snapshot logs a `[image_url:N]` placeholder, never the base64).
+
+**Proxy path:**
+
+1. Pick a text-only variant (Pro/Flash). With no `visionModel` setting, the built-in DeepSeek describer is used — the output channel logs `Vision describer: native deepseek-v4-flash-vision-exp`.
+2. To test a host-model describer instead: `DeepSeek Pilot: Set Vision Proxy Model` and pick a non-DeepSeek model.
+3. Drop an image into Copilot Chat — it is described, cached, and the description is sent to DeepSeek.
 4. Check output channel for vision resolution stats

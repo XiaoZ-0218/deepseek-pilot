@@ -38,6 +38,7 @@ export const MODELS = [
     maxInputTokens: 655360,
     maxOutputTokens: 393216,
     thinking: true,
+    nativeVision: false,
   },
   {
     id: 'deepseek-v4-pro',
@@ -50,6 +51,7 @@ export const MODELS = [
     maxInputTokens: 983040,
     maxOutputTokens: 65536,
     thinking: false,
+    nativeVision: false,
   },
   {
     id: 'deepseek-v4-flash::thinking',
@@ -62,6 +64,7 @@ export const MODELS = [
     maxInputTokens: 655360,
     maxOutputTokens: 393216,
     thinking: true,
+    nativeVision: false,
   },
   {
     id: 'deepseek-v4-flash',
@@ -74,8 +77,60 @@ export const MODELS = [
     maxInputTokens: 983040,
     maxOutputTokens: 65536,
     thinking: false,
+    nativeVision: false,
+  },
+  // DeepSeek's first multimodal model (released 2026-08-21). Billed at Flash
+  // rates; images cost at most VISION_IMAGE_TOKEN_CAP tokens each. Explicitly
+  // labeled experimental by DeepSeek — surfaced in the description so users
+  // know it may change or disappear.
+  {
+    id: 'deepseek-v4-flash-vision-exp::thinking',
+    name: 'DeepSeek V4 Flash Vision (thinking)',
+    description: 'DeepSeek V4 Flash Vision — native image input, extended thinking (experimental)',
+    detailPrefix: 'Flash Vision · thinking',
+    vendor: 'deepseek-pilot',
+    family: 'deepseek-v4-flash-vision-exp',
+    version: 'thinking',
+    maxInputTokens: 655360,
+    maxOutputTokens: 393216,
+    thinking: true,
+    nativeVision: true,
+  },
+  {
+    id: 'deepseek-v4-flash-vision-exp',
+    name: 'DeepSeek V4 Flash Vision',
+    description:
+      'DeepSeek V4 Flash Vision — native image input, no extended thinking (experimental)',
+    detailPrefix: 'Flash Vision · fast',
+    vendor: 'deepseek-pilot',
+    family: 'deepseek-v4-flash-vision-exp',
+    version: 'default',
+    maxInputTokens: 983040,
+    maxOutputTokens: 65536,
+    thinking: false,
+    nativeVision: true,
   },
 ] as const;
+
+/** The API model id of DeepSeek's native vision model (also a `MODELS` family). */
+export const NATIVE_VISION_MODEL_ID = 'deepseek-v4-flash-vision-exp';
+
+/**
+ * DeepSeek converts an image to at most this many tokens (dimension-based,
+ * capped; larger images are resized to ~800x800 server-side). Used for
+ * token estimation on native-vision variants and for the cost of an image
+ * in the converted-request character count.
+ */
+export const VISION_IMAGE_TOKEN_CAP = 384;
+
+/**
+ * Per-image raw-byte guard for native vision. DeepSeek caps base64 images at
+ * 32 MiB *encoded* and the whole request body at 48 MiB; base64 inflates by
+ * 4/3, so 24 MiB of raw bytes is the largest image that can't trip the
+ * per-image cap. Oversized images are dropped with a warning instead of
+ * letting the API 400 the whole request.
+ */
+export const VISION_IMAGE_MAX_RAW_BYTES = 24 * 1024 * 1024;
 
 /** Settings (Copilot Chat 1.121) for routing utility flows through a chosen model. */
 export const COPILOT_UTILITY_MODEL_SETTING = 'chat.utilityModel';

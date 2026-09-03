@@ -1,5 +1,6 @@
 import vscode from 'vscode';
-import type { OpenAIChatMessage, OpenAIToolCall } from '../types';
+import type { OpenAIChatMessage, OpenAIContentPart, OpenAIToolCall } from '../types';
+import { VISION_IMAGE_MAX_RAW_BYTES } from '../consts';
 import { safeJsonStringify } from '../json';
 import { logger } from '../logger';
 import { fingerprintAssistantTurn, type ReasoningCache } from './cache';
@@ -27,11 +28,16 @@ import { sanitizeFunctionName } from './sanitize';
  *      produced their tool_calls (i.e. before the next user-typed text in
  *      the same VS Code "turn", since VS Code can bundle tool_result parts
  *      and follow-up user text inside one User message).
+ *
+ *   4. (Native vision only) image parts are accepted ONLY in `user`
+ *      messages — anywhere else is a 400 — so images in other roles are
+ *      dropped with a warning rather than forwarded.
  */
 export function convertMessages(
   messages: readonly vscode.LanguageModelChatRequestMessage[],
   isThinkingModel: boolean,
   reasoningCache: ReasoningCache,
+  nativeVision = false,
 ): OpenAIChatMessage[] {
   const result: OpenAIChatMessage[] = [];
 
@@ -42,10 +48,16 @@ export function convertMessages(
   const openToolCallIds = new Set<string>();
 
   let droppedOrphanToolResults = 0;
+  let droppedImageParts = 0;
 
   for (const msg of messages) {
     const role = mapRole(msg.role);
     let content = '';
+    // On the native-vision path, user-message parts are ALSO collected in
+    // encounter order so text/image interleaving survives; used only when at
+    // least one image made it through (`content` stays authoritative otherwise).
+    const orderedParts: OpenAIContentPart[] = [];
+    let imageCount = 0;
     const toolCalls: OpenAIToolCall[] = [];
     const toolResults: Array<{ callId: string; content: string }> = [];
 
@@ -53,6 +65,25 @@ export function convertMessages(
       for (const part of msg.content) {
         if (part instanceof vscode.LanguageModelTextPart) {
           content = content ? `${content}\n${part.value}` : part.value;
+          orderedParts.push({ type: 'text', text: part.value });
+          continue;
+        }
+
+        if (
+          nativeVision &&
+          part instanceof vscode.LanguageModelDataPart &&
+          part.mimeType.startsWith('image/')
+        ) {
+          if (role !== 'user' || part.data.byteLength > VISION_IMAGE_MAX_RAW_BYTES) {
+            droppedImageParts += 1;
+            continue;
+          }
+          const base64 = Buffer.from(part.data).toString('base64');
+          orderedParts.push({
+            type: 'image_url',
+            image_url: { url: `data:${part.mimeType};base64,${base64}` },
+          });
+          imageCount += 1;
           continue;
         }
 
@@ -143,6 +174,12 @@ export function convertMessages(
       }
       result.push(assistantMessage);
       content = ''; // already emitted with the assistant turn
+      // Keep only image parts: their text siblings just went out above.
+      orderedParts.splice(
+        0,
+        orderedParts.length,
+        ...orderedParts.filter((p) => p.type === 'image_url'),
+      );
     }
 
     // 2. Tool result messages — only emit if there is a matching open
@@ -163,9 +200,14 @@ export function convertMessages(
     }
 
     // 3. Non-assistant text (system / user) follows tool results in this
-    //    same VS Code message turn.
-    if (role !== 'assistant' && content) {
-      result.push({ role, content });
+    //    same VS Code message turn. With native images present the content
+    //    goes out as an ordered parts array; plain string otherwise.
+    if (role !== 'assistant') {
+      if (imageCount > 0) {
+        result.push({ role, content: orderedParts });
+      } else if (content) {
+        result.push({ role, content });
+      }
     }
   }
 
@@ -176,6 +218,12 @@ export function convertMessages(
   if (droppedOrphanToolResults > 0) {
     logger.warn(
       `convertMessages: dropped ${droppedOrphanToolResults} orphan tool_result part(s) — no matching open tool_call in history`,
+    );
+  }
+
+  if (droppedImageParts > 0) {
+    logger.warn(
+      `convertMessages: dropped ${droppedImageParts} image part(s) — DeepSeek vision only accepts images in user messages, under 32 MiB encoded`,
     );
   }
 
