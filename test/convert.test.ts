@@ -220,6 +220,107 @@ describe('convertMessages tool-result images', () => {
     expect(result[1]).toEqual({ role: 'tool', tool_call_id: 'call_1', content: 'tool text' });
   });
 
+  it('holds a hoisted image until every parallel tool call is answered', () => {
+    // Live-API regression: with parallel tool calls the host feeds results
+    // back across several messages. Emitting the hoisted-image user message
+    // after the first result splits the tool block and DeepSeek 400s with
+    // "insufficient tool messages following tool_calls message".
+    const result = convertMessages(
+      [
+        assistantMessage([
+          new LanguageModelToolCallPart('call_1', 'viewImage', { path: 'x.png' }),
+          new LanguageModelToolCallPart('call_2', 'other', {}),
+        ]),
+        userMessage([
+          new LanguageModelToolResultPart('call_1', [
+            new LanguageModelDataPart(PNG_BYTES, 'image/png'),
+          ]),
+        ]),
+        userMessage([
+          new LanguageModelToolResultPart('call_2', [new LanguageModelTextPart('result 2')]),
+          new LanguageModelTextPart('go on'),
+        ]),
+      ],
+      false,
+      new ReasoningCache(),
+      true,
+    );
+
+    expect(result.map((m) => m.role)).toEqual(['assistant', 'tool', 'tool', 'user']);
+    expect(result[3]!.content).toEqual([
+      { type: 'text', text: '[Image returned by tool call call_1]' },
+      { type: 'image_url', image_url: { url: PNG_DATA_URL } },
+      { type: 'text', text: 'go on' },
+    ]);
+  });
+
+  it('emits a trailing user message for a hoisted image when the closing result has no text', () => {
+    const result = convertMessages(
+      [
+        assistantMessage([
+          new LanguageModelToolCallPart('call_1', 'viewImage', { path: 'x.png' }),
+          new LanguageModelToolCallPart('call_2', 'other', {}),
+        ]),
+        userMessage([
+          new LanguageModelToolResultPart('call_1', [
+            new LanguageModelDataPart(PNG_BYTES, 'image/png'),
+          ]),
+        ]),
+        userMessage([
+          new LanguageModelToolResultPart('call_2', [new LanguageModelTextPart('result 2')]),
+        ]),
+      ],
+      false,
+      new ReasoningCache(),
+      true,
+    );
+
+    expect(result.map((m) => m.role)).toEqual(['assistant', 'tool', 'tool', 'user']);
+    expect(result[3]!.content).toEqual([
+      { type: 'text', text: '[Image returned by tool call call_1]' },
+      { type: 'image_url', image_url: { url: PNG_DATA_URL } },
+    ]);
+  });
+
+  it('drops a hoisted image when the history ends mid-tool-loop, keeping the request valid', () => {
+    const result = convertMessages(
+      [
+        assistantMessage([
+          new LanguageModelToolCallPart('call_1', 'viewImage', { path: 'x.png' }),
+          new LanguageModelToolCallPart('call_2', 'other', {}),
+        ]),
+        userMessage([
+          new LanguageModelToolResultPart('call_1', [
+            new LanguageModelDataPart(PNG_BYTES, 'image/png'),
+          ]),
+        ]),
+      ],
+      false,
+      new ReasoningCache(),
+      true,
+    );
+
+    // call_2 is still open — a trailing user message would 400 the request.
+    expect(result.map((m) => m.role)).toEqual(['assistant', 'tool']);
+  });
+
+  it('does not hoist an image from an orphan tool result', () => {
+    const result = convertMessages(
+      [
+        userMessage([
+          new LanguageModelToolResultPart('call_unknown', [
+            new LanguageModelDataPart(PNG_BYTES, 'image/png'),
+          ]),
+        ]),
+      ],
+      false,
+      new ReasoningCache(),
+      true,
+    );
+
+    expect(result).toEqual([]);
+  });
+
   it('collapses a tool-result image to a placeholder on the proxy path, never raw bytes', () => {
     // resolve.ts normally describes these before convert runs; if one slips
     // through (no describer), the fallback must not JSON-dump the byte array.

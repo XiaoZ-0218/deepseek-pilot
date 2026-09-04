@@ -50,6 +50,13 @@ export function convertMessages(
   let droppedOrphanToolResults = 0;
   let droppedImageParts = 0;
 
+  // Images hoisted out of tool results, waiting for a user message they can
+  // ride out on. They must NOT be emitted while any tool_call is still
+  // unanswered: with parallel tool calls the host feeds results back across
+  // several messages, and a user message in the middle of the tool block is
+  // a 400 ("insufficient tool messages following tool_calls message").
+  const pendingImageParts: OpenAIContentPart[] = [];
+
   for (const msg of messages) {
     const role = mapRole(msg.role);
     let content = '';
@@ -115,27 +122,32 @@ export function convertMessages(
             }
             // Tool results can carry images (MCP tools, our viewImage tool).
             // DeepSeek accepts images ONLY in user messages, so they are
-            // hoisted into this turn's user content (emitted after the tool
-            // messages — see step 3) with a marker tying them to the call.
+            // hoisted into `pendingImageParts` (with a marker tying them to
+            // the call) and flushed into the first user message emitted after
+            // ALL open tool_calls have been answered — see step 3. An image
+            // in an orphan tool result is dropped along with the result.
             if (
               nativeVision &&
               item instanceof vscode.LanguageModelDataPart &&
               item.mimeType.startsWith('image/')
             ) {
-              if (role !== 'user' || item.data.byteLength > VISION_IMAGE_MAX_RAW_BYTES) {
+              if (
+                role !== 'user' ||
+                !openToolCallIds.has(part.callId) ||
+                item.data.byteLength > VISION_IMAGE_MAX_RAW_BYTES
+              ) {
                 droppedImageParts += 1;
                 continue;
               }
               const base64 = Buffer.from(item.data).toString('base64');
-              orderedParts.push({
+              pendingImageParts.push({
                 type: 'text',
                 text: `[Image returned by tool call ${part.callId}]`,
               });
-              orderedParts.push({
+              pendingImageParts.push({
                 type: 'image_url',
                 image_url: { url: `data:${item.mimeType};base64,${base64}` },
               });
-              imageCount += 1;
               hoistedImages += 1;
             }
           }
@@ -234,13 +246,35 @@ export function convertMessages(
     // 3. Non-assistant text (system / user) follows tool results in this
     //    same VS Code message turn. With native images present the content
     //    goes out as an ordered parts array; plain string otherwise.
+    //    Images hoisted from tool results join the first user message once
+    //    no tool_call is left unanswered — never before, or the user
+    //    message would split the tool block and 400 the request.
     if (role !== 'assistant') {
-      if (imageCount > 0) {
+      let flushedPendingImages = false;
+      if (role === 'user' && pendingImageParts.length > 0 && openToolCallIds.size === 0) {
+        orderedParts.unshift(...pendingImageParts);
+        pendingImageParts.length = 0;
+        flushedPendingImages = true;
+      }
+      if (imageCount > 0 || flushedPendingImages) {
         result.push({ role, content: orderedParts });
       } else if (content) {
         result.push({ role, content });
       }
     }
+  }
+
+  // Hoisted images that never found a user message to ride out on: emit a
+  // trailing user message when the tool block is complete; otherwise the
+  // history itself is mid-tool-loop and a user message would 400 it, so the
+  // images are dropped (and counted) to keep the request valid.
+  if (pendingImageParts.length > 0) {
+    if (openToolCallIds.size === 0) {
+      result.push({ role: 'user', content: [...pendingImageParts] });
+    } else {
+      droppedImageParts += pendingImageParts.filter((p) => p.type === 'image_url').length;
+    }
+    pendingImageParts.length = 0;
   }
 
   // Cleanup: if there are still open tool_calls when we exit (i.e. the

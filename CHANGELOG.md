@@ -2,6 +2,14 @@
 
 All notable changes to **DeepSeek Pilot** are recorded here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] — 2026-09-04
+
+### Fixed
+- **Agent-mode 400 on the Flash Vision variants when the model makes parallel tool calls** — `An assistant message with 'tool_calls' must be followed by tool messages responding to each 'tool_call_id'`. v0.7.0 hoisted a tool-result image into a user message emitted right after that result's tool message; with parallel tool calls the host feeds results back across several messages, so the early user message split the tool-response block the API requires to be contiguous. Hoisted images are now buffered and released into the first user content emitted after every open tool call has been answered. An image in a history that ends mid-tool-loop is dropped with a logged warning instead of invalidating the whole request, and an orphan tool result no longer contributes an image at all.
+
+### Added
+- 4 specs covering the parallel-tool-call sequences (split results, image-only closing result, mid-loop history, orphan results). The suite is now 76.
+
 ## [0.7.0] — 2026-09-04
 
 Copilot Chat only delivers real image data for images attached directly to the chat. A file referenced any other way — dragged into the prompt, mentioned with `#file:`, added via Add Context, or encountered by the agent on disk — reaches the model as a path string, so the model can name an image it cannot see. This release adds the missing piece: a tool that turns a path back into pixels, plus full handling for images returned by tools.

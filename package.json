@@ -3,7 +3,7 @@
   "displayName": "DeepSeek Pilot — Vision + Token Tracking",
   "description": "DeepSeek V4 Pro, Flash & Flash Vision in GitHub Copilot Chat. Native image input on the vision model plus a zero-config vision proxy for the text-only variants, KV-cache-aware context-window indicator, persistent reasoning cache, live session cost and platform balance in the status bar, a thinking-effort selector per model variant, and one-click wiring as Copilot's utility/utility-small model.",
   "icon": "resources/icon.png",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "publisher": "konstantyn-ganenkov",
   "license": "MIT",
   "repository": {
