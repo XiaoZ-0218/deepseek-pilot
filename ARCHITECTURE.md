@@ -21,6 +21,8 @@ src/
 ├── logger.ts             # Output channel logger (debug gated by setting)
 ├── types.ts              # OpenAI/DeepSeek API types (DSBalance, DSUsage, etc.)
 ├── utility-model.ts      # `chat.utilityModel` wiring (Copilot Chat 1.121 utility-model slots)
+├── tools/
+│   └── view-image.ts     # #viewImage LM tool — loads an image file from disk into the chat
 └── provider/
     ├── index.ts          # DeepSeekChatProvider — main LM provider class
     ├── balance.ts        # BalanceTracker — cost estimation, status bar, session spend
@@ -65,6 +67,12 @@ Two image paths, selected by the variant's `nativeVision` flag in `consts.ts`:
 - Cache: primary by `(mime + dataHash + visionModel + prompt`), secondary by `dataHash`
 - Single-flight deduplication: concurrent same-image lookups share one proxy call
 - `provideTokenCount` reads cached descriptions via `dataHash` to estimate image tokens on proxy variants
+
+**Tool-result images** ride the same two paths. Any tool can return a `LanguageModelDataPart` image inside a `LanguageModelToolResultPart` (MCP screenshot tools, the bundled `#viewImage` tool). On proxy variants, `resolve.ts` descends into tool results and replaces nested images with described text (which then flows through `convert.ts`'s existing text filter). On native variants, `convert.ts` **hoists** each tool-result image into the user message that follows the tool message — the API rejects images in `tool` role — with a `[Image returned by tool call <id>]` marker so the model can tie it back, and leaves a note in the tool message when the image was its only content. The `stringifyToolResultContent` fallback collapses any *other* data part to a `[<mime> data omitted ...]` placeholder; JSON-stringifying one would dump its raw byte array into the prompt.
+
+### The `#viewImage` tool
+
+Copilot Chat sends file *references* (drag-in, `#file:`, Add Context) to the model as a path, not as pixels — only true chat attachments arrive as image data parts. `tools/view-image.ts` closes the gap with a `languageModelTools` contribution (`deepseek-pilot_viewImage`, reference name `viewImage`, available to agent mode and `#`-referencable): input is an absolute path, workspace-relative path, or `file://` URI; the tool validates the extension against a mime allow-list, enforces `VISION_IMAGE_MAX_RAW_BYTES` from the stat size *before* reading, and returns a text label plus `LanguageModelDataPart.image(...)`. Failures (missing file, unsupported type, oversized) come back as text results rather than thrown errors so the model can react. Registered tools are host-global, so other vision-capable models in the picker benefit too.
 
 ### Tool Call Handling
 
@@ -187,3 +195,5 @@ The extension's `BalanceTracker` status bar widget is still the home for the Dee
 2. To test a host-model describer instead: `DeepSeek Pilot: Set Vision Proxy Model` and pick a non-DeepSeek model.
 3. Drop an image into Copilot Chat — it is described, cached, and the description is sent to DeepSeek.
 4. Check output channel for vision resolution stats
+
+**Tool path:** in agent mode, ask about an image by its path (or reference `#viewImage path/to/shot.png`) — the output channel logs `[tool] viewImage read ...` and the image then follows the native or proxy path per the active variant.

@@ -4,6 +4,7 @@ import { WALKTHROUGH_ID, WELCOME_SHOWN_KEY } from './consts';
 import { logger } from './logger';
 import { migrateFromDeepseekQa } from './migrate';
 import { DeepSeekChatProvider } from './provider/index';
+import { registerViewImageTool } from './tools/view-image';
 import { setCopilotUtilityModel } from './utility-model';
 
 let activeProvider: DeepSeekChatProvider | undefined;
@@ -13,9 +14,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const vscodeVersion = vscode.version;
   const userAgent = `deepseek-pilot/${extVersion} VSCode/${vscodeVersion}`;
 
-  logger.info(
-    `DeepSeek Pilot activating version=${extVersion} debug=${getDebugLoggingEnabled()}`,
-  );
+  logger.info(`DeepSeek Pilot activating version=${extVersion} debug=${getDebugLoggingEnabled()}`);
 
   // One-shot migration from the previous `deepseek-qa` namespace (the
   // extension formerly known as "deepseek-v4-qa"). Idempotent and best-
@@ -39,6 +38,10 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
   );
 
+  // Agent-mode tool: loads an image file from disk into the chat loop so a
+  // path-only reference (drag-in, #file, Add Context) becomes visible pixels.
+  registerViewImageTool(context);
+
   try {
     const provider = new DeepSeekChatProvider(context, statusBar, userAgent);
     activeProvider = provider;
@@ -50,13 +53,30 @@ export function activate(context: vscode.ExtensionContext): void {
             { label: vscode.l10n.t('$(key) Set API Key'), id: 'setApiKey' },
             { label: vscode.l10n.t('$(trash) Clear API Key'), id: 'clearApiKey' },
             { label: vscode.l10n.t('$(eye) Set Vision Proxy Model'), id: 'setVisionModel' },
-            { label: vscode.l10n.t('$(sparkle) Use as Copilot Utility Model'), id: 'setUtilityModel', description: 'titles, summaries, commits, intent' },
-            { label: vscode.l10n.t('$(zap) Use as Copilot Utility Small Model'), id: 'setUtilitySmallModel', description: 'fast, lightweight flows' },
+            {
+              label: vscode.l10n.t('$(sparkle) Use as Copilot Utility Model'),
+              id: 'setUtilityModel',
+              description: 'titles, summaries, commits, intent',
+            },
+            {
+              label: vscode.l10n.t('$(zap) Use as Copilot Utility Small Model'),
+              id: 'setUtilitySmallModel',
+              description: 'fast, lightweight flows',
+            },
             { label: vscode.l10n.t('$(refresh) Refresh Balance'), id: 'refreshBalance' },
             { label: vscode.l10n.t('$(clear-all) Clear Session Counter'), id: 'clearSession' },
-            { label: vscode.l10n.t('$(history) Show Context Window Details'), id: 'showContextWindow' },
-            { label: vscode.l10n.t('$(database) Show Reasoning Cache Stats'), id: 'showCacheStats' },
-            { label: vscode.l10n.t('$(trashcan) Clear Reasoning Cache'), id: 'clearReasoningCache' },
+            {
+              label: vscode.l10n.t('$(history) Show Context Window Details'),
+              id: 'showContextWindow',
+            },
+            {
+              label: vscode.l10n.t('$(database) Show Reasoning Cache Stats'),
+              id: 'showCacheStats',
+            },
+            {
+              label: vscode.l10n.t('$(trashcan) Clear Reasoning Cache'),
+              id: 'clearReasoningCache',
+            },
             { label: vscode.l10n.t('$(gear) Open Extension Settings'), id: 'openSettings' },
             { label: vscode.l10n.t('$(link-external) Get DeepSeek API Key'), id: 'getApiKey' },
             { label: vscode.l10n.t('$(output) Show Logs'), id: 'showLogs' },
@@ -100,10 +120,7 @@ export function activate(context: vscode.ExtensionContext): void {
             void vscode.commands.executeCommand('deepseek-pilot.clearReasoningCache');
             break;
           case 'openSettings':
-            await vscode.commands.executeCommand(
-              'workbench.action.openSettings',
-              'deepseek-pilot',
-            );
+            await vscode.commands.executeCommand('workbench.action.openSettings', 'deepseek-pilot');
             break;
           case 'getApiKey':
             await vscode.env.openExternal(
@@ -137,13 +154,17 @@ export function activate(context: vscode.ExtensionContext): void {
       ),
       vscode.commands.registerCommand('deepseek-pilot.clearReasoningCache', async () => {
         const choice = await vscode.window.showWarningMessage(
-          vscode.l10n.t('Clear the persistent DeepSeek reasoning cache? Multi-turn thinking conversations may temporarily fall back to empty reasoning chains on the next reply.'),
+          vscode.l10n.t(
+            'Clear the persistent DeepSeek reasoning cache? Multi-turn thinking conversations may temporarily fall back to empty reasoning chains on the next reply.',
+          ),
           { modal: false },
           vscode.l10n.t('Clear'),
         );
         if (choice !== vscode.l10n.t('Clear')) return;
         provider.clearReasoningCache();
-        void vscode.window.showInformationMessage(vscode.l10n.t('DeepSeek reasoning cache cleared.'));
+        void vscode.window.showInformationMessage(
+          vscode.l10n.t('DeepSeek reasoning cache cleared.'),
+        );
       }),
       vscode.commands.registerCommand('deepseek-pilot.showCacheStats', () => {
         const stats = provider.getCacheStats();
@@ -172,10 +193,17 @@ export function activate(context: vscode.ExtensionContext): void {
         logger.info('Cache stats requested');
         logger.show();
 
-        const summary = vscode.l10n.t('Cache: {0} entries, {1}% hit rate', String(stats.entryCount), hitPct);
+        const summary = vscode.l10n.t(
+          'Cache: {0} entries, {1}% hit rate',
+          String(stats.entryCount),
+          hitPct,
+        );
         if (stats.totalMisses > 0 && stats.hitRate < 0.5 && stats.totalGets > 4) {
           void vscode.window.showWarningMessage(
-            vscode.l10n.t('{0} — low hit rate may cause 400 errors in multi-turn conversations. Try starting a new chat.', summary),
+            vscode.l10n.t(
+              '{0} — low hit rate may cause 400 errors in multi-turn conversations. Try starting a new chat.',
+              summary,
+            ),
             { modal: false, detail: msg },
           );
         } else {
@@ -196,7 +224,9 @@ export function activate(context: vscode.ExtensionContext): void {
   } catch (error) {
     activeProvider = undefined;
     logger.error('Failed to activate DeepSeek Pilot extension', error);
-    void vscode.window.showErrorMessage(vscode.l10n.t('DeepSeek Pilot: Activation failed. Check the output log.'));
+    void vscode.window.showErrorMessage(
+      vscode.l10n.t('DeepSeek Pilot: Activation failed. Check the output log.'),
+    );
     throw error;
   }
 }

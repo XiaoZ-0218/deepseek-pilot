@@ -21,6 +21,7 @@ Requires **VS Code 1.120+** and the GitHub Copilot Chat extension.
 - **Six model variants in the picker** — Pro, Flash, and Flash Vision, each with thinking / non-thinking modes, grouped under one **DeepSeek V4** row. Thinking variants expose a per-model **Thinking Effort** (low / high / max) control.
 - **Native image input on the Flash Vision variants** — attachments go to DeepSeek's own multimodal model (`deepseek-v4-flash-vision-exp`, released 2026-08-21) as real pixels, billed at Flash rates and capped at 384 tokens per image. DeepSeek labels the model experimental.
 - **Images work on the text-only variants too, zero-config** — a describer model summarises each attachment so Pro/Flash can reason over the content. By default that describer is DeepSeek's own vision model via your existing API key; point `deepseek-pilot.visionModel` at any host model to override. Descriptions are cached by image hash, so the same screenshot never re-bills.
+- **A `#viewImage` tool for image files on disk** — Copilot sends dragged-in files, `#file:` mentions, and Add Context attachments to the model as a *path*, not as pixels, so the model can name an image it cannot see. This tool closes that gap: in agent mode the model calls it with the path (or you reference `#viewImage` yourself) and the actual image enters the conversation — natively on the Flash Vision variants, as a described summary on Pro/Flash. Images returned by any other tool (MCP screenshot tools, for example) now flow through the same pipeline instead of being dropped.
 - **Live context-window indicator, DeepSeek-aware** — status-bar item showing `% of window used · cache-hit %` with KV-cache-aware guidance ("keep going, your cache is healthy" vs. "compact now"). Configurable thresholds.
 - **Real session cost & platform balance** — token counts, running spend in your account currency (USD / CNY auto-detected from the DeepSeek API), and a one-click balance refresh. **Peak/off-peak aware:** DeepSeek has billed on a time-of-day schedule since 2026-08-16 (peak 01:00-04:00 and 06:00-10:00 UTC, off-peak at half price), so both the cost estimate and the model picker quote the rate actually in force and name the tier.
 - **Persistent reasoning cache** — reasoning traces from thinking variants are fingerprinted, persisted across VS Code restarts, and replayed during multi-turn agent loops so DeepSeek's KV cache stays warm.
@@ -35,6 +36,7 @@ Requires **VS Code 1.120+** and the GitHub Copilot Chat extension.
 | Works inside Copilot Chat | Yes | Yes | No — separate UI |
 | Copilot agent mode, tools, MCP, skills | Yes | Yes | Reimplemented, partial |
 | Vision / image attachments | Yes — native on Flash Vision, proxied on Pro/Flash | No | No |
+| Image files on disk (`#viewImage` tool) | Yes — any variant, agent mode included | No | No |
 | Live cost, balance & cache-hit in the status bar | Yes | No | Varies |
 | KV-cache-aware compaction guidance | Yes | No | No |
 | Per-session spend in your account currency | Yes | No | No |
@@ -91,6 +93,7 @@ All six variants remain visible in the Copilot Chat model picker.
 
 - Thinking variants expose a per-model `Thinking Effort` control with `low`, `high`, and `max`.
 - The Flash Vision pair reads image attachments natively; the other variants describe them via the vision proxy.
+- For an image that exists as a *file* rather than an attachment, reference `#viewImage` in the prompt (or let agent mode call it) — attaching a file by drag-in or `#file:` only hands the model its path.
 - If the provider is visible but not fully configured yet, use `Manage Provider` from the picker or command palette.
 
 ## Status Bar

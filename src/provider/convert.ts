@@ -105,17 +105,49 @@ export function convertMessages(
         }
 
         if (part instanceof vscode.LanguageModelToolResultPart) {
-          const toolContent = part.content
-            .filter(
-              (item): item is vscode.LanguageModelTextPart =>
-                item instanceof vscode.LanguageModelTextPart,
-            )
-            .map((item) => item.value)
-            .join('\n');
+          const textItems: string[] = [];
+          let hoistedImages = 0;
 
+          for (const item of part.content) {
+            if (item instanceof vscode.LanguageModelTextPart) {
+              textItems.push(item.value);
+              continue;
+            }
+            // Tool results can carry images (MCP tools, our viewImage tool).
+            // DeepSeek accepts images ONLY in user messages, so they are
+            // hoisted into this turn's user content (emitted after the tool
+            // messages — see step 3) with a marker tying them to the call.
+            if (
+              nativeVision &&
+              item instanceof vscode.LanguageModelDataPart &&
+              item.mimeType.startsWith('image/')
+            ) {
+              if (role !== 'user' || item.data.byteLength > VISION_IMAGE_MAX_RAW_BYTES) {
+                droppedImageParts += 1;
+                continue;
+              }
+              const base64 = Buffer.from(item.data).toString('base64');
+              orderedParts.push({
+                type: 'text',
+                text: `[Image returned by tool call ${part.callId}]`,
+              });
+              orderedParts.push({
+                type: 'image_url',
+                image_url: { url: `data:${item.mimeType};base64,${base64}` },
+              });
+              imageCount += 1;
+              hoistedImages += 1;
+            }
+          }
+
+          const toolContent = textItems.join('\n');
           toolResults.push({
             callId: part.callId,
-            content: toolContent || stringifyToolResultContent(part.content),
+            content:
+              toolContent ||
+              (hoistedImages > 0
+                ? `Returned ${hoistedImages} image(s); attached in the user message that follows.`
+                : stringifyToolResultContent(part.content)),
           });
         }
       }
@@ -242,7 +274,9 @@ function mapRole(role: vscode.LanguageModelChatMessageRole): 'system' | 'user' |
 function stringifyToolResultContent(parts: ReadonlyArray<unknown>): string {
   // VS Code 1.118+ may append an internal LanguageModelDataPart sentinel
   // (mimeType "cache_control", data "ephemeral") at the end of tool-result
-  // turns. Drop it silently; warn on truly unknown shapes.
+  // turns. Drop it silently. Other data parts collapse to a placeholder —
+  // JSON-stringifying one would dump its byte array (an image is megabytes
+  // of `{"0":137,...}`) straight into the prompt. Warn on unknown shapes.
   const acc: string[] = [];
   for (const item of parts) {
     if (item instanceof vscode.LanguageModelTextPart) {
@@ -252,7 +286,11 @@ function stringifyToolResultContent(parts: ReadonlyArray<unknown>): string {
     } else {
       const isObj = !!item && typeof item === 'object';
       const mimeType = isObj ? (item as { mimeType?: unknown }).mimeType : undefined;
-      if (mimeType !== 'cache_control') {
+      if (typeof mimeType === 'string') {
+        if (mimeType !== 'cache_control') {
+          acc.push(`[${mimeType} data omitted — this model variant cannot ingest it here]`);
+        }
+      } else {
         try {
           acc.push(safeJsonStringify(item));
         } catch {

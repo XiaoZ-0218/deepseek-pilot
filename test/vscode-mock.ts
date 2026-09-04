@@ -12,7 +12,18 @@ export class LanguageModelDataPart {
     public readonly data: Uint8Array,
     public readonly mimeType: string,
   ) {}
+
+  static image(data: Uint8Array, mime: string): LanguageModelDataPart {
+    return new LanguageModelDataPart(data, mime);
+  }
 }
+
+// view-image.ts returns tool results; tests inspect their content array.
+export class LanguageModelToolResult {
+  constructor(public readonly content: unknown[]) {}
+}
+
+export class CancellationError extends Error {}
 
 export class LanguageModelToolCallPart {
   constructor(
@@ -47,7 +58,17 @@ export const window = {
 };
 
 export const workspace = {
-  getConfiguration: () => ({ get: () => undefined }),
+  // Honors the caller-supplied default, matching the real API's behavior
+  // when a setting is unset. `workspaceFolders` is mutable so tests can
+  // stand in a temp directory for relative-path resolution.
+  getConfiguration: () => ({ get: (_key: string, def?: unknown) => def }),
+  workspaceFolders: undefined as Array<{ uri: { fsPath: string } }> | undefined,
+};
+
+// view-image.ts localizes its progress message; identity-substitute {0}.
+export const l10n = {
+  t: (message: string, ...args: unknown[]) =>
+    message.replace(/\{(\d+)\}/g, (_m, i) => String(args[Number(i)] ?? '')),
 };
 
 export default {
@@ -55,7 +76,10 @@ export default {
   LanguageModelDataPart,
   LanguageModelToolCallPart,
   LanguageModelToolResultPart,
+  LanguageModelToolResult,
   LanguageModelChatMessageRole,
+  CancellationError,
   window,
   workspace,
+  l10n,
 };

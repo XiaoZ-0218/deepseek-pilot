@@ -136,8 +136,16 @@ function isImageDataPart(part: unknown): part is vscode.LanguageModelDataPart {
   return part instanceof vscode.LanguageModelDataPart && part.mimeType.startsWith('image/');
 }
 
+/** Tool results (MCP tools, the viewImage tool) can carry images too. */
+function isToolResultWithImages(part: unknown): part is vscode.LanguageModelToolResultPart {
+  return part instanceof vscode.LanguageModelToolResultPart && part.content.some(isImageDataPart);
+}
+
 function hasImageParts(msg: vscode.LanguageModelChatRequestMessage): boolean {
-  return Array.isArray(msg.content) && msg.content.some(isImageDataPart);
+  return (
+    Array.isArray(msg.content) &&
+    msg.content.some((p) => isImageDataPart(p) || isToolResultWithImages(p))
+  );
 }
 
 /**
@@ -168,8 +176,20 @@ export async function resolveImageMessages(
         resolved.push(msg);
         continue;
       }
-      const filtered = (msg.content as readonly unknown[]).filter((p) => !isImageDataPart(p));
-      stats.droppedImageParts += (msg.content as readonly unknown[]).length - filtered.length;
+      const filtered: unknown[] = [];
+      for (const p of msg.content as readonly unknown[]) {
+        if (isImageDataPart(p)) {
+          stats.droppedImageParts += 1;
+          continue;
+        }
+        if (isToolResultWithImages(p)) {
+          const kept = p.content.filter((item) => !isImageDataPart(item));
+          stats.droppedImageParts += p.content.length - kept.length;
+          filtered.push(new vscode.LanguageModelToolResultPart(p.callId, kept));
+          continue;
+        }
+        filtered.push(p);
+      }
       resolved.push({
         role: msg.role,
         content: filtered as never,
@@ -190,74 +210,23 @@ export async function resolveImageMessages(
 
     const resolvedParts: unknown[] = [];
     for (const part of message.content as readonly unknown[]) {
-      if (!isImageDataPart(part)) {
-        resolvedParts.push(part);
+      if (isImageDataPart(part)) {
+        resolvedParts.push(await describeAsTextPart(part, visionModel, visionPrompt, stats));
         continue;
       }
-
-      stats.totalDescriptions += 1;
-      const dataHash = computeDataHash(part.data);
-      const cacheKey = createCacheKey(part, visionModel.id, visionPrompt, dataHash);
-
-      const cached = getCachedDescription(cacheKey);
-      if (cached !== undefined) {
-        stats.hits += 1;
-        stats.cacheHits += 1;
-        resolvedParts.push(
-          new vscode.LanguageModelTextPart(
-            `${IMAGE_DESCRIPTION_PREFIX}${cached}${IMAGE_DESCRIPTION_SUFFIX}`,
-          ),
-        );
+      if (isToolResultWithImages(part)) {
+        const inner: unknown[] = [];
+        for (const item of part.content) {
+          inner.push(
+            isImageDataPart(item)
+              ? await describeAsTextPart(item, visionModel, visionPrompt, stats)
+              : item,
+          );
+        }
+        resolvedParts.push(new vscode.LanguageModelToolResultPart(part.callId, inner));
         continue;
       }
-
-      // Single-flight: if another in-flight request is already describing
-      // this exact image with the same model+prompt, await its result.
-      let descPromise = pendingVisionDescriptions.get(cacheKey);
-      if (descPromise) {
-        stats.deduplicatedDescriptions += 1;
-      } else {
-        stats.misses += 1;
-        stats.cacheMisses += 1;
-        descPromise = visionModel.describe(part, visionPrompt).then(
-          (description) => {
-            if (description.length > 0) {
-              rememberDescription(cacheKey, description, dataHash);
-            }
-            return description;
-          },
-          (err: unknown) => {
-            logger.warn('Vision proxy failed', err);
-            return '';
-          },
-        );
-        pendingVisionDescriptions.set(cacheKey, descPromise);
-        void descPromise.finally(() => {
-          if (pendingVisionDescriptions.get(cacheKey) === descPromise) {
-            pendingVisionDescriptions.delete(cacheKey);
-          }
-        });
-      }
-
-      let description = '';
-      try {
-        description = await descPromise;
-      } catch {
-        /* handled below */
-      }
-
-      if (description.length === 0) {
-        stats.failedDescriptions += 1;
-        resolvedParts.push(new vscode.LanguageModelTextPart(IMAGE_DESCRIPTION_UNAVAILABLE));
-        continue;
-      }
-
-      stats.generatedDescriptions += 1;
-      resolvedParts.push(
-        new vscode.LanguageModelTextPart(
-          `${IMAGE_DESCRIPTION_PREFIX}${description}${IMAGE_DESCRIPTION_SUFFIX}`,
-        ),
-      );
+      resolvedParts.push(part);
     }
 
     result.push({
@@ -268,4 +237,74 @@ export async function resolveImageMessages(
 
   stats.entries = visionDescriptionCache.size;
   return { resolvedMessages: result, stats, visionModelId: visionModel.id };
+}
+
+/**
+ * Describe one image part (via cache / single-flight / proxy call) and return
+ * the replacement text part. Shared by top-level user-message images and
+ * images nested inside tool results.
+ */
+async function describeAsTextPart(
+  part: vscode.LanguageModelDataPart,
+  visionModel: VisionDescriber,
+  visionPrompt: string,
+  stats: VisionDescriptionCacheStats,
+): Promise<vscode.LanguageModelTextPart> {
+  stats.totalDescriptions += 1;
+  const dataHash = computeDataHash(part.data);
+  const cacheKey = createCacheKey(part, visionModel.id, visionPrompt, dataHash);
+
+  const cached = getCachedDescription(cacheKey);
+  if (cached !== undefined) {
+    stats.hits += 1;
+    stats.cacheHits += 1;
+    return new vscode.LanguageModelTextPart(
+      `${IMAGE_DESCRIPTION_PREFIX}${cached}${IMAGE_DESCRIPTION_SUFFIX}`,
+    );
+  }
+
+  // Single-flight: if another in-flight request is already describing
+  // this exact image with the same model+prompt, await its result.
+  let descPromise = pendingVisionDescriptions.get(cacheKey);
+  if (descPromise) {
+    stats.deduplicatedDescriptions += 1;
+  } else {
+    stats.misses += 1;
+    stats.cacheMisses += 1;
+    descPromise = visionModel.describe(part, visionPrompt).then(
+      (description) => {
+        if (description.length > 0) {
+          rememberDescription(cacheKey, description, dataHash);
+        }
+        return description;
+      },
+      (err: unknown) => {
+        logger.warn('Vision proxy failed', err);
+        return '';
+      },
+    );
+    pendingVisionDescriptions.set(cacheKey, descPromise);
+    void descPromise.finally(() => {
+      if (pendingVisionDescriptions.get(cacheKey) === descPromise) {
+        pendingVisionDescriptions.delete(cacheKey);
+      }
+    });
+  }
+
+  let description = '';
+  try {
+    description = await descPromise;
+  } catch {
+    /* handled below */
+  }
+
+  if (description.length === 0) {
+    stats.failedDescriptions += 1;
+    return new vscode.LanguageModelTextPart(IMAGE_DESCRIPTION_UNAVAILABLE);
+  }
+
+  stats.generatedDescriptions += 1;
+  return new vscode.LanguageModelTextPart(
+    `${IMAGE_DESCRIPTION_PREFIX}${description}${IMAGE_DESCRIPTION_SUFFIX}`,
+  );
 }

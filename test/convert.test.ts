@@ -6,7 +6,13 @@ import { ReasoningCache } from '../src/provider/cache';
 import { VISION_IMAGE_MAX_RAW_BYTES } from '../src/consts';
 import type { OpenAIContentPart } from '../src/types';
 
-const { LanguageModelTextPart, LanguageModelDataPart, LanguageModelChatMessageRole } = mock;
+const {
+  LanguageModelTextPart,
+  LanguageModelDataPart,
+  LanguageModelToolCallPart,
+  LanguageModelToolResultPart,
+  LanguageModelChatMessageRole,
+} = mock;
 
 type HostMessage = vscode.LanguageModelChatRequestMessage;
 
@@ -127,5 +133,112 @@ describe('convertMessages native vision', () => {
     );
 
     expect(result).toEqual([{ role: 'user', content: 'described elsewhere' }]);
+  });
+});
+
+describe('convertMessages tool-result images', () => {
+  function toolCallTurn(): HostMessage[] {
+    return [
+      assistantMessage([new LanguageModelToolCallPart('call_1', 'viewImage', { path: 'x.png' })]),
+    ];
+  }
+
+  it('hoists a tool-result image into the user message that follows the tool message', () => {
+    const result = convertMessages(
+      [
+        ...toolCallTurn(),
+        userMessage([
+          new LanguageModelToolResultPart('call_1', [
+            new LanguageModelTextPart('Image x.png (image/png):'),
+            new LanguageModelDataPart(PNG_BYTES, 'image/png'),
+          ]),
+          new LanguageModelTextPart('continue'),
+        ]),
+      ],
+      false,
+      new ReasoningCache(),
+      true,
+    );
+
+    expect(result).toHaveLength(3);
+    expect(result[1]).toEqual({
+      role: 'tool',
+      tool_call_id: 'call_1',
+      content: 'Image x.png (image/png):',
+    });
+    expect(result[2]).toEqual({
+      role: 'user',
+      content: [
+        { type: 'text', text: '[Image returned by tool call call_1]' },
+        { type: 'image_url', image_url: { url: PNG_DATA_URL } },
+        { type: 'text', text: 'continue' },
+      ],
+    });
+  });
+
+  it('notes the attachment in an image-only tool result so the tool message is not empty', () => {
+    const result = convertMessages(
+      [
+        ...toolCallTurn(),
+        userMessage([
+          new LanguageModelToolResultPart('call_1', [
+            new LanguageModelDataPart(PNG_BYTES, 'image/png'),
+          ]),
+        ]),
+      ],
+      false,
+      new ReasoningCache(),
+      true,
+    );
+
+    expect(result[1]!.content).toContain('attached in the user message that follows');
+    expect(result[2]!.role).toBe('user');
+    expect(result[2]!.content).toEqual([
+      { type: 'text', text: '[Image returned by tool call call_1]' },
+      { type: 'image_url', image_url: { url: PNG_DATA_URL } },
+    ]);
+  });
+
+  it('drops an oversized tool-result image instead of hoisting it', () => {
+    const oversize = new Uint8Array(VISION_IMAGE_MAX_RAW_BYTES + 1);
+    const result = convertMessages(
+      [
+        ...toolCallTurn(),
+        userMessage([
+          new LanguageModelToolResultPart('call_1', [
+            new LanguageModelTextPart('tool text'),
+            new LanguageModelDataPart(oversize, 'image/png'),
+          ]),
+        ]),
+      ],
+      false,
+      new ReasoningCache(),
+      true,
+    );
+
+    expect(result).toHaveLength(2);
+    expect(result[1]).toEqual({ role: 'tool', tool_call_id: 'call_1', content: 'tool text' });
+  });
+
+  it('collapses a tool-result image to a placeholder on the proxy path, never raw bytes', () => {
+    // resolve.ts normally describes these before convert runs; if one slips
+    // through (no describer), the fallback must not JSON-dump the byte array.
+    const result = convertMessages(
+      [
+        ...toolCallTurn(),
+        userMessage([
+          new LanguageModelToolResultPart('call_1', [
+            new LanguageModelDataPart(PNG_BYTES, 'image/png'),
+          ]),
+        ]),
+      ],
+      false,
+      new ReasoningCache(),
+    );
+
+    expect(result).toHaveLength(2);
+    expect(result[1]!.content).toBe(
+      '[image/png data omitted — this model variant cannot ingest it here]',
+    );
   });
 });

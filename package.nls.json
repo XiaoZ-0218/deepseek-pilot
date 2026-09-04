@@ -29,6 +29,8 @@
   "deepseek-pilot.config.title": "DeepSeek Pilot",
   "deepseek-pilot.config.visionModel": "Model ID for the vision proxy that describes images for the text-only DeepSeek variants. Leave empty for the default: DeepSeek's own vision model (deepseek-v4-flash-vision-exp) via your DeepSeek API key. Use 'DeepSeek Pilot: Set Vision Proxy Model' to pick from a list.",
   "deepseek-pilot.config.visionPrompt": "Prompt sent to the vision proxy model when describing image attachments.",
+  "deepseek-pilot.tool.viewImage.displayName": "View Image File",
+  "deepseek-pilot.tool.viewImage.userDescription": "Load an image file from disk so the model can see its contents. Useful when a chat references an image by path instead of attaching it.",
   "deepseek-pilot.walkthrough.description": "Set up your DeepSeek API key and start using V4 models in Copilot Chat with vision + token tracking.",
   "deepseek-pilot.walkthrough.step1.description": "[Get an API key](https://platform.deepseek.com/api_keys) from platform.deepseek.com.\n[Set API Key](command:deepseek-pilot.setApiKey)",
   "deepseek-pilot.walkthrough.step1.title": "Set your DeepSeek API key",

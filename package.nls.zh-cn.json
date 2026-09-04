@@ -29,6 +29,8 @@
   "deepseek-pilot.config.title": "DeepSeek Pilot",
   "deepseek-pilot.config.visionModel": "为纯文本 DeepSeek 变体描述图像的视觉代理模型 ID。留空则使用默认值：通过你的 DeepSeek API 密钥调用 DeepSeek 自家的视觉模型（deepseek-v4-flash-vision-exp）。使用「DeepSeek Pilot：设置视觉代理模型」从列表中选择。",
   "deepseek-pilot.config.visionPrompt": "描述图像附件时发送给视觉代理模型的提示词。",
+  "deepseek-pilot.tool.viewImage.displayName": "查看图片文件",
+  "deepseek-pilot.tool.viewImage.userDescription": "从磁盘加载图片文件，让模型能看到其内容。当对话中只引用了图片路径而没有附加图片时很有用。",
   "deepseek-pilot.walkthrough.description": "设置你的 DeepSeek API 密钥，开始在 Copilot Chat 中使用 V4 模型，享受视觉代理和 token 追踪功能。",
   "deepseek-pilot.walkthrough.step1.description": "从 platform.deepseek.com [获取 API 密钥](https://platform.deepseek.com/api_keys)。\n[设置 API 密钥](command:deepseek-pilot.setApiKey)",
   "deepseek-pilot.walkthrough.step1.title": "设置你的 DeepSeek API 密钥",

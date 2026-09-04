@@ -2,6 +2,18 @@
 
 All notable changes to **DeepSeek Pilot** are recorded here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] — 2026-09-04
+
+Copilot Chat only delivers real image data for images attached directly to the chat. A file referenced any other way — dragged into the prompt, mentioned with `#file:`, added via Add Context, or encountered by the agent on disk — reaches the model as a path string, so the model can name an image it cannot see. This release adds the missing piece: a tool that turns a path back into pixels, plus full handling for images returned by tools.
+
+### Added
+- **`#viewImage` language-model tool** (`deepseek-pilot_viewImage`). The model — or the user, via `#viewImage` in the prompt — passes an absolute path, workspace-relative path, or `file://` URI of a png/jpg/jpeg/webp/gif/bmp file and receives the actual image. Available in agent mode; missing files, unsupported types, and files over DeepSeek's size cap return an explanatory text result the model can act on. Registered tools are host-global, so other vision-capable models can use it too.
+- **Images inside tool results are now processed instead of dropped.** Any tool that returns an image (the new viewImage tool, MCP screenshot tools) works on every variant: the Flash Vision pair receives the pixels inline — hoisted into the following user message, since the API rejects images in the `tool` role — and the text-only Pro/Flash variants receive a vision-proxy description in place.
+- 16 specs covering the tool (path resolution, mime mapping, guard rails) and the two tool-result image paths. The suite is now 72.
+
+### Fixed
+- A tool result whose only content was a data part could have its raw byte array JSON-dumped into the prompt (megabytes of `{"0":137,...}` for an image). Non-text data parts in tool results now collapse to a short placeholder.
+
 ## [0.6.0] — 2026-09-03
 
 DeepSeek released its first multimodal model, **`deepseek-v4-flash-vision-exp`**, on 2026-08-21 ([release note](https://api-docs.deepseek.com/news/news260821)) — four days after v0.5.0 shipped. This release adopts it on both fronts: as a pair of picker variants that read images natively, and as the new zero-config default for the vision proxy that serves the text-only variants. Pricing, model IDs, effort levels, and context limits were re-verified against the live docs on 2026-09-03 and are unchanged.

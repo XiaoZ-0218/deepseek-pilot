@@ -65,5 +65,6 @@
   "Currently selected": "Currently selected",
   "Pick a model to describe images before sending them to DeepSeek": "Pick a model to describe images before sending them to DeepSeek",
   "Vision proxy model set to: {0}": "Vision proxy model set to: {0}",
-  "DeepSeek built-in vision model (default, uses your DeepSeek API key)": "DeepSeek built-in vision model (default, uses your DeepSeek API key)"
+  "DeepSeek built-in vision model (default, uses your DeepSeek API key)": "DeepSeek built-in vision model (default, uses your DeepSeek API key)",
+  "Reading image {0}": "Reading image {0}"
 }

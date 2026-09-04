@@ -3,7 +3,7 @@
   "displayName": "DeepSeek Pilot — Vision + Token Tracking",
   "description": "DeepSeek V4 Pro, Flash & Flash Vision in GitHub Copilot Chat. Native image input on the vision model plus a zero-config vision proxy for the text-only variants, KV-cache-aware context-window indicator, persistent reasoning cache, live session cost and platform balance in the status bar, a thinking-effort selector per model variant, and one-click wiring as Copilot's utility/utility-small model.",
   "icon": "resources/icon.png",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "publisher": "konstantyn-ganenkov",
   "license": "MIT",
   "repository": {
@@ -63,6 +63,34 @@
         "vendor": "deepseek-pilot",
         "displayName": "DeepSeek Pilot",
         "managementCommand": "deepseek-pilot.manage"
+      }
+    ],
+    "languageModelTools": [
+      {
+        "name": "deepseek-pilot_viewImage",
+        "displayName": "%deepseek-pilot.tool.viewImage.displayName%",
+        "userDescription": "%deepseek-pilot.tool.viewImage.userDescription%",
+        "modelDescription": "Load an image file from the local disk so its actual visual content becomes available to you. Use this whenever the conversation references an image file (png, jpg, jpeg, webp, gif, bmp) by path, URI, or attachment link whose pixels you cannot already see - for example a screenshot, UI mockup, diagram, or photo mentioned by filename. Input is the absolute path, workspace-relative path, or file:// URI of the image. Returns the image itself; on models without native image input the image is replaced by a detailed text description.",
+        "toolReferenceName": "viewImage",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(file-media)",
+        "tags": [
+          "vision",
+          "image",
+          "screenshot"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Absolute path, workspace-relative path, or file:// URI of the image file to view."
+            }
+          },
+          "required": [
+            "path"
+          ]
+        }
       }
     ],
     "commands": [
