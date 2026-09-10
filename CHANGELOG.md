@@ -2,6 +2,24 @@
 
 All notable changes to **DeepSeek Pilot** are recorded here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] — 2026-09-10
+
+Re-verification pass against DeepSeek's live API ([pricing](https://api-docs.deepseek.com/quick_start/pricing), its [zh-cn counterpart](https://api-docs.deepseek.com/zh-cn/quick_start/pricing), and the [API reference](https://api-docs.deepseek.com/api/create-chat-completion), all read 2026-09-10) and the current host (VS Code 1.137.0 with Copilot Chat 0.65.0). DeepSeek shipped **V4.1 Flash** as its new flagship under the model id `deepseek-flash`: it is natively multimodal (absorbing the experimental `deepseek-v4-flash-vision-exp`), cheaper than V4 Flash, and replaces V4 Pro too — from **2026-09-14 04:00 UTC** DeepSeek serves `deepseek-v4-pro` requests with V4.1 Flash and bills them at the Flash price. The legacy `deepseek-v4-flash` / `deepseek-v4-flash-vision-exp` ids remain accepted but are routed the same way. Peak billing hours also became weekday-only.
+
+### Changed
+- **Model lineup goes from six variants to four** — `DeepSeek V4.1 Flash` and `DeepSeek V4.1 Flash (thinking)` (API id `deepseek-flash`, native image input) plus the existing `DeepSeek V4 Pro` pair. The separate Flash Vision pair is gone because the capability moved into Flash itself. The Pro pair keeps the `deepseek-v4-pro` id — DeepSeek serves it via V4.1 Flash from 2026-09-14, and keeping the id means it upgrades in place if a V4.1 Pro ships behind it; its picker description states the routing. The picker row is now labeled **DeepSeek** (previously DeepSeek V4). A previously selected Flash or Flash Vision variant must be re-picked once, since those ids changed.
+- **Flash rates cut to the published V4.1 card** — peak cache-miss $0.44 to $0.30, output $1.32 to $1.20, cache-hit $0.014 to $0.006 per Mtok (CNY ¥3/¥9/¥0.1 to ¥2/¥8/¥0.04); off-peak remains exactly half. Pro's own rates are unchanged but apply only until the 2026-09-14 cutover — `getRates` date-gates the switch, so cost estimates bill Pro requests at the Flash price from the moment DeepSeek does.
+- **Peak hours are now Monday-Friday only** (01:00-04:00 and 06:00-10:00 UTC; the zh-cn page's 周一至周五 09:00-12:00 / 14:00-18:00 Beijing time is the same window). Weekends bill entirely off-peak, and the tier check, picker hints, and status-bar rate line all reflect it. The UTC day-of-week test is exact because both peak windows fall where the UTC and Beijing calendar days coincide.
+- **The zero-config vision describer now calls `deepseek-flash`** instead of the retired vision-exp id.
+- **`deepseek-pilot.modelIdOverrides` slots follow the live ids** — a `deepseek-flash` slot (which also covers the built-in vision describer) replaces the `deepseek-v4-flash` and `deepseek-v4-flash-vision-exp` slots. Proxy users who had either old slot set should re-key it to `deepseek-flash`.
+- The utility-model wiring commands recommend the V4.1 Flash variants, and the utility-request markers are refreshed for Copilot Chat 0.65's reworded prompts (chat titles, history compaction) while keeping the older wordings for hosts back to 1.120. Copilot Chat 0.65's prompt categorizer now calls a forced tool, so the no-tools gate skips it by design — it runs on the utility-small slot, not the active model.
+
+### Fixed
+- Host contracts re-verified against Copilot Chat 0.65.0: the `usage` MIME contract, the `cached_tokens` mapping, and the `chat.utilityModel` / `chat.utilitySmallModel` value format are all unchanged and keep working; `languageModelThinkingPart` is still a proposed API in VS Code 1.137, so the runtime feature-detection and text fallback remain the shipping path. The `engines.vscode` 1.120 floor stays — the stable API is unchanged through 1.137 apart from doc comments.
+
+### Added
+- Specs for the weekday-aware rate tier, the V4.1 Flash rate card in both currencies, the Pro-to-Flash billing cutover, and the Copilot Chat 0.65 utility-prompt wordings. The suite is now 81.
+
 ## [0.7.1] — 2026-09-04
 
 ### Fixed

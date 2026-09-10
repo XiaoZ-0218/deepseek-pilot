@@ -27,10 +27,48 @@ export const MAX_TOOLS_PER_REQUEST = 128;
  * [pricing.ts](src/pricing.ts).
  */
 export const MODELS = [
+  // V4.1 Flash (API id `deepseek-flash`, released 2026-09) is the flagship: it
+  // absorbed the experimental `deepseek-v4-flash-vision-exp` model, so vision
+  // is native here — images cost at most VISION_IMAGE_TOKEN_CAP tokens each.
+  // The retired `deepseek-v4-flash` / vision-exp ids still route to it.
+  {
+    id: 'deepseek-flash::thinking',
+    name: 'DeepSeek V4.1 Flash (thinking)',
+    description:
+      'DeepSeek V4.1 Flash — flagship, extended thinking, native image input, 1M context',
+    detailPrefix: 'Flash · thinking',
+    vendor: 'deepseek-pilot',
+    family: 'deepseek-flash',
+    version: 'thinking',
+    maxInputTokens: 655360,
+    maxOutputTokens: 393216,
+    thinking: true,
+    nativeVision: true,
+  },
+  {
+    id: 'deepseek-flash',
+    name: 'DeepSeek V4.1 Flash',
+    description:
+      'DeepSeek V4.1 Flash — flagship, native image input, no extended thinking, lowest latency',
+    detailPrefix: 'Flash · fast',
+    vendor: 'deepseek-pilot',
+    family: 'deepseek-flash',
+    version: 'default',
+    maxInputTokens: 983040,
+    maxOutputTokens: 65536,
+    thinking: false,
+    nativeVision: true,
+  },
+  // V4 Pro stays selectable because DeepSeek keeps the `deepseek-v4-pro` id
+  // alive: from 2026-09-14 04:00 UTC requests to it are served by V4.1 Flash
+  // and billed at the Flash price, and the id is the upgrade path if a V4.1
+  // Pro ships behind it. Vision stays off — the Pro API rejects image parts,
+  // so images ride the describe-and-replace proxy here.
   {
     id: 'deepseek-v4-pro::thinking',
     name: 'DeepSeek V4 Pro (thinking)',
-    description: 'DeepSeek V4 Pro — strongest, extended thinking, 1M context',
+    description:
+      'DeepSeek V4 Pro — extended thinking, 1M context; served by V4.1 Flash from 2026-09-14',
     detailPrefix: 'Pro · thinking',
     vendor: 'deepseek-pilot',
     family: 'deepseek-v4-pro',
@@ -43,7 +81,8 @@ export const MODELS = [
   {
     id: 'deepseek-v4-pro',
     name: 'DeepSeek V4 Pro',
-    description: 'DeepSeek V4 Pro — strong, no extended thinking, lower latency',
+    description:
+      'DeepSeek V4 Pro — no extended thinking, 1M context; served by V4.1 Flash from 2026-09-14',
     detailPrefix: 'Pro · fast',
     vendor: 'deepseek-pilot',
     family: 'deepseek-v4-pro',
@@ -53,67 +92,15 @@ export const MODELS = [
     thinking: false,
     nativeVision: false,
   },
-  {
-    id: 'deepseek-v4-flash::thinking',
-    name: 'DeepSeek V4 Flash (thinking)',
-    description: 'DeepSeek V4 Flash — cheapest with extended thinking',
-    detailPrefix: 'Flash · thinking',
-    vendor: 'deepseek-pilot',
-    family: 'deepseek-v4-flash',
-    version: 'thinking',
-    maxInputTokens: 655360,
-    maxOutputTokens: 393216,
-    thinking: true,
-    nativeVision: false,
-  },
-  {
-    id: 'deepseek-v4-flash',
-    name: 'DeepSeek V4 Flash',
-    description: 'DeepSeek V4 Flash — cheapest, no extended thinking',
-    detailPrefix: 'Flash · fast',
-    vendor: 'deepseek-pilot',
-    family: 'deepseek-v4-flash',
-    version: 'default',
-    maxInputTokens: 983040,
-    maxOutputTokens: 65536,
-    thinking: false,
-    nativeVision: false,
-  },
-  // DeepSeek's first multimodal model (released 2026-08-21). Billed at Flash
-  // rates; images cost at most VISION_IMAGE_TOKEN_CAP tokens each. Explicitly
-  // labeled experimental by DeepSeek — surfaced in the description so users
-  // know it may change or disappear.
-  {
-    id: 'deepseek-v4-flash-vision-exp::thinking',
-    name: 'DeepSeek V4 Flash Vision (thinking)',
-    description: 'DeepSeek V4 Flash Vision — native image input, extended thinking (experimental)',
-    detailPrefix: 'Flash Vision · thinking',
-    vendor: 'deepseek-pilot',
-    family: 'deepseek-v4-flash-vision-exp',
-    version: 'thinking',
-    maxInputTokens: 655360,
-    maxOutputTokens: 393216,
-    thinking: true,
-    nativeVision: true,
-  },
-  {
-    id: 'deepseek-v4-flash-vision-exp',
-    name: 'DeepSeek V4 Flash Vision',
-    description:
-      'DeepSeek V4 Flash Vision — native image input, no extended thinking (experimental)',
-    detailPrefix: 'Flash Vision · fast',
-    vendor: 'deepseek-pilot',
-    family: 'deepseek-v4-flash-vision-exp',
-    version: 'default',
-    maxInputTokens: 983040,
-    maxOutputTokens: 65536,
-    thinking: false,
-    nativeVision: true,
-  },
 ] as const;
 
-/** The API model id of DeepSeek's native vision model (also a `MODELS` family). */
-export const NATIVE_VISION_MODEL_ID = 'deepseek-v4-flash-vision-exp';
+/**
+ * The API model id the built-in vision describer targets (also the Flash
+ * `MODELS` family). Since V4.1 the flagship Flash model is itself multimodal,
+ * so the describer — which only serves the text-only Pro variants — calls it
+ * directly rather than the retired `deepseek-v4-flash-vision-exp`.
+ */
+export const NATIVE_VISION_MODEL_ID = 'deepseek-flash';
 
 /**
  * DeepSeek converts an image to at most this many tokens (dimension-based,

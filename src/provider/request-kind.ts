@@ -23,19 +23,28 @@ import vscode from 'vscode';
  *
  * The markers are necessarily heuristic — Copilot's internal prompts are not a
  * public contract and may change between releases. If they drift, the only
- * effect is that the optimization stops firing.
+ * effect is that the optimization stops firing. Because the extension supports
+ * hosts back to VS Code 1.120, markers from older Copilot Chat builds are kept
+ * alongside the current wording rather than replaced.
+ *
+ * Wording last re-checked against Copilot Chat 0.65.0 (VS Code 1.137,
+ * 2026-09-10). Note the 0.65 prompt categorizer now calls a forced
+ * `categorize_prompt` tool, so the no-tools gate below skips it by design —
+ * it runs on the utility-small model slot, not the active model.
  */
 const UTILITY_SYSTEM_PROMPT_MARKERS = [
-  'pithy', // chat title generation ("expert in crafting pithy ... titles")
-  'short, descriptive title',
+  'pithy', // 0.65: "pithy branch names"; older builds: "pithy ... titles"
+  'ultra-compact title', // 0.65 chat title generation ("crafting ultra-compact titles")
+  'short, descriptive title', // older title flows
   'one-line summary',
   'summarize the conversation',
+  'detailed summary of the entire conversation', // 0.65 history-compaction system prompt
   'commit message', // git commit message generation
-  'suggest a branch name', // git branch name
+  'suggest a branch name', // git branch name (older builds)
   'branch name for', //
-  'suggest names for', // rename suggestions
+  'suggest names for', // rename suggestions (older builds)
   'rename suggestion',
-  'categorize the', // prompt categorizer / intent detection
+  'categorize the', // prompt categorizer / intent detection (older builds)
   'classify the user',
 ];
 

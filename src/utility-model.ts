@@ -17,7 +17,7 @@ import { priceHint } from './pricing';
  * benefit from extended reasoning.
  */
 export async function setCopilotUtilityModel(slot: 'primary' | 'small'): Promise<void> {
-  const recommendedId = slot === 'small' ? 'deepseek-v4-flash' : 'deepseek-v4-flash::thinking';
+  const recommendedId = slot === 'small' ? 'deepseek-flash' : 'deepseek-flash::thinking';
 
   const items = MODELS.map((m) => ({
     label: m.name,

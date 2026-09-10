@@ -1,24 +1,25 @@
 /**
- * DeepSeek V4 per-million-token pricing — the single source of truth for both
+ * DeepSeek per-million-token pricing — the single source of truth for both
  * the model-picker hints and the status-bar cost estimate.
  *
  * Sources: https://api-docs.deepseek.com/quick_start/pricing (USD) and its
- * zh-cn counterpart (CNY), both read 2026-08-17.
+ * zh-cn counterpart (CNY), both read 2026-09-10 (the V4.1 Flash card).
  *
- * Effective **2026-08-16 16:00 UTC** DeepSeek bills on a peak/off-peak
- * schedule rather than one flat rate. Peak is 01:00-04:00 and 06:00-10:00 UTC;
- * the zh-cn page states the same window as 09:00-12:00 and 14:00-18:00 Beijing
- * time, which is UTC+8, so the two agree. Every other hour is off-peak at
- * exactly half the peak rate.
+ * DeepSeek bills on a peak/off-peak schedule. Peak is 01:00-04:00 and
+ * 06:00-10:00 UTC **Monday-Friday**; the zh-cn page states the same window as
+ * 周一至周五 09:00-12:00 / 14:00-18:00 Beijing time (UTC+8), so the two agree.
+ * Weekends and every other weekday hour are off-peak at exactly half the peak
+ * rate. Both peak windows sit inside 01:00-10:00 UTC, where the UTC and
+ * Beijing calendar days coincide, so a plain UTC day-of-week test is exact.
  *
- * This is a price INCREASE, not a relabelled discount: the off-peak column
- * sits above every rate the extension shipped through v0.4.3 (which encoded
- * the flat post-promo card — Pro at $0.435 cache-miss / $0.87 output). Those
- * figures understated real spend by roughly 1.5x off-peak and up to 4.7x at
- * peak, so they are replaced outright rather than kept as a fallback.
+ * V4.1 Flash (2026-09) cut Flash rates below the V4 card (peak cache-miss
+ * $0.44 -> $0.30, output $1.32 -> $1.20). V4 Pro keeps its own rates only
+ * until 2026-09-14 04:00 UTC (12:00 Beijing); from then DeepSeek routes
+ * `deepseek-v4-pro` requests to V4.1 Flash and bills them at the Flash price,
+ * pending a V4.1 Pro release.
  */
 
-export type ModelFamily = 'deepseek-v4-pro' | 'deepseek-v4-flash';
+export type ModelFamily = 'deepseek-v4-pro' | 'deepseek-flash';
 
 /** Any model identifier accepted by the rate lookups; resolved via `resolveFamily`. */
 export type PriceableModel = ModelFamily | (string & {});
@@ -40,11 +41,11 @@ export interface Rates {
 const PEAK_RATES: Record<PricingCurrency, Record<ModelFamily, Rates>> = {
   USD: {
     'deepseek-v4-pro': { cacheHit: 0.044, cacheMiss: 1.32, output: 3.96 },
-    'deepseek-v4-flash': { cacheHit: 0.014, cacheMiss: 0.44, output: 1.32 },
+    'deepseek-flash': { cacheHit: 0.006, cacheMiss: 0.3, output: 1.2 },
   },
   CNY: {
     'deepseek-v4-pro': { cacheHit: 0.3, cacheMiss: 9, output: 27 },
-    'deepseek-v4-flash': { cacheHit: 0.1, cacheMiss: 3, output: 9 },
+    'deepseek-flash': { cacheHit: 0.04, cacheMiss: 2, output: 8 },
   },
 };
 
@@ -57,10 +58,19 @@ const PEAK_WINDOWS_UTC: readonly (readonly [number, number])[] = [
   [6, 10],
 ];
 
+/**
+ * From 12:00 Beijing (04:00 UTC) on 2026-09-14, `deepseek-v4-pro` requests are
+ * routed to V4.1 Flash and billed at the Flash price (pricing-page deprecation
+ * note), so Pro's own rate row only applies before this instant.
+ */
+const PRO_BILLS_AS_FLASH_FROM_MS = Date.UTC(2026, 8, 14, 4);
+
 /** Peak schedule in prose, for tooltips and settings copy. */
-export const PEAK_WINDOW_DESCRIPTION = '01:00-04:00 and 06:00-10:00 UTC';
+export const PEAK_WINDOW_DESCRIPTION = '01:00-04:00 and 06:00-10:00 UTC Mon-Fri';
 
 export function getRateTier(at: Date = new Date()): RateTier {
+  const day = at.getUTCDay();
+  if (day === 0 || day === 6) return 'off-peak'; // weekends are entirely off-peak
   const hour = at.getUTCHours();
   // Note 04:00-06:00 UTC falls BETWEEN the two peak windows and is off-peak.
   return PEAK_WINDOWS_UTC.some(([from, to]) => hour >= from && hour < to) ? 'peak' : 'off-peak';
@@ -71,7 +81,11 @@ export function getRates(
   currency: PricingCurrency = 'USD',
   at: Date = new Date(),
 ): Rates {
-  const peak = PEAK_RATES[currency][resolveFamily(model)];
+  let family = resolveFamily(model);
+  if (family === 'deepseek-v4-pro' && at.getTime() >= PRO_BILLS_AS_FLASH_FROM_MS) {
+    family = 'deepseek-flash';
+  }
+  const peak = PEAK_RATES[currency][family];
   if (getRateTier(at) === 'peak') return peak;
   return {
     cacheHit: peak.cacheHit * OFF_PEAK_FACTOR,
@@ -82,12 +96,13 @@ export function getRates(
 
 /**
  * An unrecognised model id prices as Pro — the dearer tier — so a request we
- * failed to tag over-reports rather than under-reports spend. The prefix match
- * folds `deepseek-v4-flash-vision-exp` into Flash: DeepSeek bills the vision
- * model at V4-Flash rates (pricing page, 2026-08-21 release note).
+ * failed to tag over-reports rather than under-reports spend. The substring
+ * match covers the live `deepseek-flash` id plus the retired-but-still-routed
+ * `deepseek-v4-flash` / `deepseek-v4-flash-vision-exp` legacy ids, all of
+ * which DeepSeek bills at the Flash price.
  */
 export function resolveFamily(model: string): ModelFamily {
-  return model.startsWith('deepseek-v4-flash') ? 'deepseek-v4-flash' : 'deepseek-v4-pro';
+  return model.includes('flash') ? 'deepseek-flash' : 'deepseek-v4-pro';
 }
 
 /** Trims to the pricing page's precision and drops trailing zeros: `0.007`, `1.32`, `27`. */

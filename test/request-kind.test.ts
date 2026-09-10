@@ -39,6 +39,35 @@ describe('isUtilityRequest', () => {
     expect(isUtility([sys('Write a commit message for the following diff.')], false)).toBe(true);
   });
 
+  it('matches the 0.65 title and branch-name wording', () => {
+    expect(
+      isUtility(
+        [sys('You are an expert in crafting ultra-compact titles for chatbot conversations.')],
+        false,
+      ),
+    ).toBe(true);
+    expect(
+      isUtility(
+        [sys('You are an expert in crafting pithy branch names for Git Repos.')],
+        false,
+      ),
+    ).toBe(true);
+  });
+
+  it('matches the 0.65 history-compaction system prompt', () => {
+    expect(
+      isUtility(
+        [
+          sys(
+            'Your task is to create a comprehensive, detailed summary of the entire conversation that captures all essential information.',
+          ),
+          user('Summarize the conversation history so far.'),
+        ],
+        false,
+      ),
+    ).toBe(true);
+  });
+
   it('scans the leading user message when there is no system role', () => {
     expect(isUtility([user('Suggest a branch name for these changes')], false)).toBe(true);
   });

@@ -7,12 +7,15 @@ import {
   resolveFamily,
 } from '../src/pricing';
 
-/** Fixed instants either side of the peak windows, so nothing depends on "now". */
+/**
+ * Fixed instants so nothing depends on "now". 2026-08-17 is a Monday, before
+ * the 2026-09-14 Pro->Flash billing cutover, so Pro's own rates apply.
+ */
 const OFF_PEAK = new Date('2026-08-17T12:00:00Z');
 const PEAK = new Date('2026-08-17T02:00:00Z');
 
 describe('getRateTier', () => {
-  it('treats 01:00-04:00 and 06:00-10:00 UTC as peak', () => {
+  it('treats weekday 01:00-04:00 and 06:00-10:00 UTC as peak', () => {
     for (const hour of [1, 2, 3, 6, 7, 8, 9]) {
       expect(getRateTier(new Date(Date.UTC(2026, 7, 17, hour)))).toBe('peak');
     }
@@ -23,10 +26,22 @@ describe('getRateTier', () => {
     expect(getRateTier(new Date(Date.UTC(2026, 7, 17, 5)))).toBe('off-peak');
   });
 
-  it('treats every hour outside both windows as off-peak', () => {
+  it('treats every weekday hour outside both windows as off-peak', () => {
     for (const hour of [0, 10, 11, 15, 20, 23]) {
       expect(getRateTier(new Date(Date.UTC(2026, 7, 17, hour)))).toBe('off-peak');
     }
+  });
+
+  it('treats weekends as off-peak even inside the peak windows', () => {
+    // 2026-09-12 is a Saturday, 2026-09-13 a Sunday.
+    expect(getRateTier(new Date('2026-09-12T02:00:00Z'))).toBe('off-peak');
+    expect(getRateTier(new Date('2026-09-12T09:00:00Z'))).toBe('off-peak');
+    expect(getRateTier(new Date('2026-09-13T07:30:00Z'))).toBe('off-peak');
+  });
+
+  it('switches on the weekday boundary: Friday peaks, Monday peaks again', () => {
+    expect(getRateTier(new Date('2026-09-11T09:00:00Z'))).toBe('peak'); // Friday
+    expect(getRateTier(new Date('2026-09-14T02:00:00Z'))).toBe('peak'); // Monday
   });
 
   it('switches exactly on the hour boundaries', () => {
@@ -40,17 +55,18 @@ describe('getRateTier', () => {
 });
 
 describe('getRates', () => {
-  // Cell-for-cell against https://api-docs.deepseek.com/quick_start/pricing.
+  // Cell-for-cell against https://api-docs.deepseek.com/quick_start/pricing
+  // (the V4.1 Flash card, read 2026-09-10).
   it('matches the published USD peak column', () => {
     expect(getRates('deepseek-v4-pro', 'USD', PEAK)).toEqual({
       cacheHit: 0.044,
       cacheMiss: 1.32,
       output: 3.96,
     });
-    expect(getRates('deepseek-v4-flash', 'USD', PEAK)).toEqual({
-      cacheHit: 0.014,
-      cacheMiss: 0.44,
-      output: 1.32,
+    expect(getRates('deepseek-flash', 'USD', PEAK)).toEqual({
+      cacheHit: 0.006,
+      cacheMiss: 0.3,
+      output: 1.2,
     });
   });
 
@@ -60,25 +76,25 @@ describe('getRates', () => {
       cacheMiss: 0.66,
       output: 1.98,
     });
-    expect(getRates('deepseek-v4-flash', 'USD', OFF_PEAK)).toEqual({
-      cacheHit: 0.007,
-      cacheMiss: 0.22,
-      output: 0.66,
+    expect(getRates('deepseek-flash', 'USD', OFF_PEAK)).toEqual({
+      cacheHit: 0.003,
+      cacheMiss: 0.15,
+      output: 0.6,
     });
   });
 
-  // The zh-cn pricing page; peak stated as 09:00-12:00 / 14:00-18:00 Beijing
-  // time, which is the same window as the UTC one used above.
+  // The zh-cn pricing page; peak stated as 周一至周五 09:00-12:00 / 14:00-18:00
+  // Beijing time, the same window (and weekdays) as the UTC one used above.
   it('matches the published CNY peak column', () => {
     expect(getRates('deepseek-v4-pro', 'CNY', PEAK)).toEqual({
       cacheHit: 0.3,
       cacheMiss: 9,
       output: 27,
     });
-    expect(getRates('deepseek-v4-flash', 'CNY', PEAK)).toEqual({
-      cacheHit: 0.1,
-      cacheMiss: 3,
-      output: 9,
+    expect(getRates('deepseek-flash', 'CNY', PEAK)).toEqual({
+      cacheHit: 0.04,
+      cacheMiss: 2,
+      output: 8,
     });
   });
 
@@ -88,34 +104,57 @@ describe('getRates', () => {
       cacheMiss: 4.5,
       output: 13.5,
     });
-    expect(getRates('deepseek-v4-flash', 'CNY', OFF_PEAK)).toEqual({
-      cacheHit: 0.05,
-      cacheMiss: 1.5,
-      output: 4.5,
+    expect(getRates('deepseek-flash', 'CNY', OFF_PEAK)).toEqual({
+      cacheHit: 0.02,
+      cacheMiss: 1,
+      output: 4,
     });
   });
 
-  it('prices Pro above Flash in every column', () => {
+  it('prices Pro above Flash in every column (before the routing cutover)', () => {
     for (const at of [PEAK, OFF_PEAK]) {
       const pro = getRates('deepseek-v4-pro', 'USD', at);
-      const flash = getRates('deepseek-v4-flash', 'USD', at);
+      const flash = getRates('deepseek-flash', 'USD', at);
       expect(pro.cacheHit).toBeGreaterThan(flash.cacheHit);
       expect(pro.cacheMiss).toBeGreaterThan(flash.cacheMiss);
       expect(pro.output).toBeGreaterThan(flash.output);
     }
   });
+
+  it('bills Pro at the Flash price from 2026-09-14 04:00 UTC (12:00 Beijing)', () => {
+    // 03:59 UTC Monday is still inside a peak window: Pro's own peak rates.
+    const justBefore = new Date('2026-09-14T03:59:59Z');
+    expect(getRates('deepseek-v4-pro', 'USD', justBefore)).toEqual({
+      cacheHit: 0.044,
+      cacheMiss: 1.32,
+      output: 3.96,
+    });
+    // From the cutover instant, Pro requests are routed to V4.1 Flash and
+    // billed at Flash rates; 04:00 UTC sits in the off-peak gap.
+    const atCutover = new Date('2026-09-14T04:00:00Z');
+    expect(getRates('deepseek-v4-pro', 'USD', atCutover)).toEqual(
+      getRates('deepseek-flash', 'USD', atCutover),
+    );
+    const laterPeak = new Date('2026-09-15T07:00:00Z');
+    expect(getRates('deepseek-v4-pro', 'USD', laterPeak)).toEqual({
+      cacheHit: 0.006,
+      cacheMiss: 0.3,
+      output: 1.2,
+    });
+  });
 });
 
 describe('resolveFamily', () => {
-  it('resolves the two known families', () => {
-    expect(resolveFamily('deepseek-v4-flash')).toBe('deepseek-v4-flash');
+  it('resolves the two billed families', () => {
+    expect(resolveFamily('deepseek-flash')).toBe('deepseek-flash');
     expect(resolveFamily('deepseek-v4-pro')).toBe('deepseek-v4-pro');
   });
 
-  it('bills the vision model at Flash rates, per the 2026-08-21 release note', () => {
-    expect(resolveFamily('deepseek-v4-flash-vision-exp')).toBe('deepseek-v4-flash');
+  it('bills the retired-but-routed legacy Flash ids at Flash rates', () => {
+    expect(resolveFamily('deepseek-v4-flash')).toBe('deepseek-flash');
+    expect(resolveFamily('deepseek-v4-flash-vision-exp')).toBe('deepseek-flash');
     expect(getRates('deepseek-v4-flash-vision-exp', 'USD', PEAK)).toEqual(
-      getRates('deepseek-v4-flash', 'USD', PEAK),
+      getRates('deepseek-flash', 'USD', PEAK),
     );
   });
 
@@ -132,14 +171,14 @@ describe('priceHint', () => {
     expect(priceHint('deepseek-v4-pro', PEAK)).toBe(
       '$1.32/$3.96 per Mtok in/out · peak',
     );
-    expect(priceHint('deepseek-v4-flash', OFF_PEAK)).toBe(
-      '$0.22/$0.66 per Mtok in/out · off-peak',
+    expect(priceHint('deepseek-flash', OFF_PEAK)).toBe(
+      '$0.15/$0.6 per Mtok in/out · off-peak',
     );
   });
 });
 
 describe('priceFields', () => {
-  it('reports the current V4 rates, not the retired flat card', () => {
+  it('reports the current Pro rates while they still apply', () => {
     expect(priceFields('deepseek-v4-pro', OFF_PEAK)).toEqual({
       inputCost: '$0.66',
       outputCost: '$1.98',
@@ -152,22 +191,22 @@ describe('priceFields', () => {
     });
   });
 
-  it('reports Flash pricing, including the three-decimal cache-hit rate', () => {
-    expect(priceFields('deepseek-v4-flash', OFF_PEAK)).toEqual({
-      inputCost: '$0.22',
-      outputCost: '$0.66',
-      cacheCost: '$0.007',
+  it('reports V4.1 Flash pricing, including the three-decimal cache-hit rate', () => {
+    expect(priceFields('deepseek-flash', OFF_PEAK)).toEqual({
+      inputCost: '$0.15',
+      outputCost: '$0.6',
+      cacheCost: '$0.003',
     });
-    expect(priceFields('deepseek-v4-flash', PEAK)).toEqual({
-      inputCost: '$0.44',
-      outputCost: '$1.32',
-      cacheCost: '$0.014',
+    expect(priceFields('deepseek-flash', PEAK)).toEqual({
+      inputCost: '$0.3',
+      outputCost: '$1.2',
+      cacheCost: '$0.006',
     });
   });
 
   it('formats without floating-point dust', () => {
     for (const at of [PEAK, OFF_PEAK]) {
-      for (const family of ['deepseek-v4-pro', 'deepseek-v4-flash'] as const) {
+      for (const family of ['deepseek-v4-pro', 'deepseek-flash'] as const) {
         for (const value of Object.values(priceFields(family, at))) {
           expect(value).toMatch(/^\$\d+(\.\d{1,4})?$/);
         }

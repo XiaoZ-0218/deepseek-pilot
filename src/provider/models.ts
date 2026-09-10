@@ -65,7 +65,7 @@ export function toChatInfo(
     isUserSelectable: true,
     statusIcon,
     // Group the four variants under one collapsible row in the model picker.
-    category: { label: 'DeepSeek V4', order: 50 },
+    category: { label: 'DeepSeek', order: 50 },
     capabilities: {
       imageInput: true,
       // Tell the host the explicit per-request tool cap so it can truncate
