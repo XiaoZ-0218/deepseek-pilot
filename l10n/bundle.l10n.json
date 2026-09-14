@@ -110,5 +110,11 @@
   "_DeepSeek caches by **prefix**. A long, stable conversation gets cheaper and faster as turns accumulate — cache hits cost ~90% less and skip the prefill stage._": "_DeepSeek caches by **prefix**. A long, stable conversation gets cheaper and faster as turns accumulate — cache hits cost ~90% less and skip the prefill stage._",
   "_Compacting rewrites the prefix and **invalidates the cache**. Use it only when you're close to the hard context limit. Below ~60% of window, compacting will cost you more than it saves._": "_Compacting rewrites the prefix and **invalidates the cache**. Use it only when you're close to the hard context limit. Below ~60% of window, compacting will cost you more than it saves._",
   "DeepSeek caches by prefix. Long stable conversations get cheaper and faster as turns accumulate — cache hits cost ~90% less and skip prefill.": "DeepSeek caches by prefix. Long stable conversations get cheaper and faster as turns accumulate — cache hits cost ~90% less and skip prefill.",
-  "Compacting rewrites the prefix and invalidates the cache; use it only near the hard limit.": "Compacting rewrites the prefix and invalidates the cache; use it only near the hard limit."
+  "Compacting rewrites the prefix and invalidates the cache; use it only near the hard limit.": "Compacting rewrites the prefix and invalidates the cache; use it only near the hard limit.",
+  "titles, summaries, commits, intent": "titles, summaries, commits, intent",
+  "fast, lightweight flows": "fast, lightweight flows",
+  "Thinking Effort": "Thinking Effort",
+  "Lightest reasoning; fastest and cheapest.": "Lightest reasoning; fastest and cheapest.",
+  "Shorter reasoning chains; the DeepSeek default.": "Shorter reasoning chains; the DeepSeek default.",
+  "Maximum reasoning depth; slower and uses more tokens.": "Maximum reasoning depth; slower and uses more tokens."
 }

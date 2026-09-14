@@ -109,13 +109,13 @@ function buildThinkingEffortSchema() {
     properties: {
       reasoningEffort: {
         type: 'string',
-        title: 'Thinking Effort',
+        title: vscode.l10n.t('Thinking Effort'),
         enum: ['low', 'high', 'max'],
         enumItemLabels: ['Low', 'High', 'Max'],
         enumDescriptions: [
-          'Lightest reasoning; fastest and cheapest.',
-          'Shorter reasoning chains; the DeepSeek default.',
-          'Maximum reasoning depth; slower and uses more tokens.',
+          vscode.l10n.t('Lightest reasoning; fastest and cheapest.'),
+          vscode.l10n.t('Shorter reasoning chains; the DeepSeek default.'),
+          vscode.l10n.t('Maximum reasoning depth; slower and uses more tokens.'),
         ],
         default: 'max',
         group: 'navigation',

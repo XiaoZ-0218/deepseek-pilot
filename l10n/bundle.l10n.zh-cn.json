@@ -110,5 +110,11 @@
   "_DeepSeek caches by **prefix**. A long, stable conversation gets cheaper and faster as turns accumulate — cache hits cost ~90% less and skip the prefill stage._": "_DeepSeek 按**前缀**缓存。长而稳定的对话会随着轮次累积变得更便宜、更快——缓存命中便宜约 90%，且跳过预填充阶段。_",
   "_Compacting rewrites the prefix and **invalidates the cache**. Use it only when you're close to the hard context limit. Below ~60% of window, compacting will cost you more than it saves._": "_压缩会重写前缀并**使缓存失效**。仅在接近上下文硬上限时才使用。在窗口使用率低于 ~60% 时，压缩的代价大于收益。_",
   "DeepSeek caches by prefix. Long stable conversations get cheaper and faster as turns accumulate — cache hits cost ~90% less and skip prefill.": "DeepSeek 按前缀缓存。长而稳定的对话会随着轮次累积变得更便宜、更快——缓存命中便宜约 90% 且跳过预填充。",
-  "Compacting rewrites the prefix and invalidates the cache; use it only near the hard limit.": "压缩会重写前缀并使缓存失效；仅在接近硬上限时使用。"
+  "Compacting rewrites the prefix and invalidates the cache; use it only near the hard limit.": "压缩会重写前缀并使缓存失效；仅在接近硬上限时使用。",
+  "titles, summaries, commits, intent": "标题、摘要、提交信息、意图识别",
+  "fast, lightweight flows": "快速、轻量级流程",
+  "Thinking Effort": "推理深度",
+  "Lightest reasoning; fastest and cheapest.": "最轻量的推理；速度最快、成本最低。",
+  "Shorter reasoning chains; the DeepSeek default.": "更短的推理链；DeepSeek 的默认值。",
+  "Maximum reasoning depth; slower and uses more tokens.": "最大推理深度；响应较慢且消耗更多 token。"
 }

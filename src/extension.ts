@@ -56,12 +56,12 @@ export function activate(context: vscode.ExtensionContext): void {
             {
               label: vscode.l10n.t('$(sparkle) Use as Copilot Utility Model'),
               id: 'setUtilityModel',
-              description: 'titles, summaries, commits, intent',
+              description: vscode.l10n.t('titles, summaries, commits, intent'),
             },
             {
               label: vscode.l10n.t('$(zap) Use as Copilot Utility Small Model'),
               id: 'setUtilitySmallModel',
-              description: 'fast, lightweight flows',
+              description: vscode.l10n.t('fast, lightweight flows'),
             },
             { label: vscode.l10n.t('$(refresh) Refresh Balance'), id: 'refreshBalance' },
             { label: vscode.l10n.t('$(clear-all) Clear Session Counter'), id: 'clearSession' },
