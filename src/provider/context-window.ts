@@ -105,9 +105,10 @@ export class ContextWindowTracker {
         turn: null,
         pctUsed: 0,
         cacheHitPct: 0,
-        headline: 'No turns recorded yet',
-        advice:
-          'Send a message and the indicator will populate from DeepSeek\'s `usage` field.',
+        headline: vscode.l10n.t('No turns recorded yet'),
+        advice: vscode.l10n.t(
+          "Send a message and the indicator will populate from DeepSeek's `usage` field.",
+        ),
       };
     }
 
@@ -123,9 +124,13 @@ export class ContextWindowTracker {
         turn,
         pctUsed,
         cacheHitPct,
-        headline: `Critical — ${pctUsed.toFixed(0)}% of context window used`,
-        advice:
-          'Compact or start a new chat **now**. You\'re close to the hard limit; the next long turn risks truncation. The KV-cache penalty from compacting is worth it at this saturation.',
+        headline: vscode.l10n.t(
+          'Critical — {0}% of context window used',
+          pctUsed.toFixed(0),
+        ),
+        advice: vscode.l10n.t(
+          "Compact or start a new chat **now**. You're close to the hard limit; the next long turn risks truncation. The KV-cache penalty from compacting is worth it at this saturation.",
+        ),
       };
     }
     if (pctUsed >= warn) {
@@ -134,9 +139,10 @@ export class ContextWindowTracker {
         turn,
         pctUsed,
         cacheHitPct,
-        headline: `Heads up — ${pctUsed.toFixed(0)}% used`,
-        advice:
+        headline: vscode.l10n.t('Heads up — {0}% used', pctUsed.toFixed(0)),
+        advice: vscode.l10n.t(
           'Plan to wrap up or compact soon. If the conversation will keep going for many more turns, compacting now is reasonable; otherwise the cache savings probably still win.',
+        ),
       };
     }
     if (cacheHitPct < 30 && pctUsed > 10) {
@@ -145,9 +151,10 @@ export class ContextWindowTracker {
         turn,
         pctUsed,
         cacheHitPct,
-        headline: `Low cache hit rate (${cacheHitPct.toFixed(0)}%)`,
-        advice:
-          'Recent turns are invalidating the prefix — usually caused by editing earlier messages, switching models, or large randomised system context. If you didn\'t do any of that on purpose, the cache may simply be cold (first turn after idle). It should recover over the next few turns.',
+        headline: vscode.l10n.t('Low cache hit rate ({0}%)', cacheHitPct.toFixed(0)),
+        advice: vscode.l10n.t(
+          "Recent turns are invalidating the prefix — usually caused by editing earlier messages, switching models, or large randomised system context. If you didn't do any of that on purpose, the cache may simply be cold (first turn after idle). It should recover over the next few turns.",
+        ),
       };
     }
     return {
@@ -155,9 +162,14 @@ export class ContextWindowTracker {
       turn,
       pctUsed,
       cacheHitPct,
-      headline: `Healthy — ${pctUsed.toFixed(0)}% used, ${cacheHitPct.toFixed(0)}% cached`,
-      advice:
-        'Plenty of room. **Don\'t compact yet** — the KV cache is doing its job and a compaction here would force the next 1-3 turns into full cache-miss prefill (slower + more expensive).',
+      headline: vscode.l10n.t(
+        'Healthy — {0}% used, {1}% cached',
+        pctUsed.toFixed(0),
+        cacheHitPct.toFixed(0),
+      ),
+      advice: vscode.l10n.t(
+        "Plenty of room. **Don't compact yet** — the KV cache is doing its job and a compaction here would force the next 1-3 turns into full cache-miss prefill (slower + more expensive).",
+      ),
     };
   }
 
@@ -175,11 +187,25 @@ export class ContextWindowTracker {
     const md = [
       vscode.l10n.t('**DeepSeek Context Window** — {0}', turn.modelName),
       '',
-      `**Last turn:** ${turn.promptTokens.toLocaleString()} / ${turn.maxInputTokens.toLocaleString()} prompt tokens (**${snap.pctUsed.toFixed(1)}%** of window)`,
-      `**Cache hit:** ${turn.cacheHitTokens.toLocaleString()} hit + ${turn.cacheMissTokens.toLocaleString()} miss = **${snap.cacheHitPct.toFixed(0)}%** hit rate`,
-      `**Output:** ${turn.completionTokens.toLocaleString()} completion tokens (max ${turn.maxOutputTokens.toLocaleString()})`,
+      vscode.l10n.t(
+        '**Last turn:** {0} / {1} prompt tokens (**{2}%** of window)',
+        turn.promptTokens.toLocaleString(),
+        turn.maxInputTokens.toLocaleString(),
+        snap.pctUsed.toFixed(1),
+      ),
+      vscode.l10n.t(
+        '**Cache hit:** {0} hit + {1} miss = **{2}%** hit rate',
+        turn.cacheHitTokens.toLocaleString(),
+        turn.cacheMissTokens.toLocaleString(),
+        snap.cacheHitPct.toFixed(0),
+      ),
+      vscode.l10n.t(
+        '**Output:** {0} completion tokens (max {1})',
+        turn.completionTokens.toLocaleString(),
+        turn.maxOutputTokens.toLocaleString(),
+      ),
       '',
-      `**Status:** ${snap.headline}`,
+      vscode.l10n.t('**Status:** {0}', snap.headline),
       '',
       snap.advice,
       '',
@@ -199,16 +225,24 @@ export class ContextWindowTracker {
 
 export function kvCachePrimerMarkdown(): string {
   return [
-    '_DeepSeek caches by **prefix**. A long, stable conversation gets cheaper and faster as turns accumulate — cache hits cost ~90% less and skip the prefill stage._',
+    vscode.l10n.t(
+      '_DeepSeek caches by **prefix**. A long, stable conversation gets cheaper and faster as turns accumulate — cache hits cost ~90% less and skip the prefill stage._',
+    ),
     '',
-    '_Compacting rewrites the prefix and **invalidates the cache**. Use it only when you\'re close to the hard context limit. Below ~60% of window, compacting will cost you more than it saves._',
+    vscode.l10n.t(
+      "_Compacting rewrites the prefix and **invalidates the cache**. Use it only when you're close to the hard context limit. Below ~60% of window, compacting will cost you more than it saves._",
+    ),
   ].join('\n');
 }
 
 function kvCachePrimerPlain(): string {
   return [
-    'DeepSeek caches by prefix. Long stable conversations get cheaper and faster as turns accumulate — cache hits cost ~90% less and skip prefill.',
-    'Compacting rewrites the prefix and invalidates the cache; use it only near the hard limit.',
+    vscode.l10n.t(
+      'DeepSeek caches by prefix. Long stable conversations get cheaper and faster as turns accumulate — cache hits cost ~90% less and skip prefill.',
+    ),
+    vscode.l10n.t(
+      'Compacting rewrites the prefix and invalidates the cache; use it only near the hard limit.',
+    ),
   ].join('\n');
 }
 

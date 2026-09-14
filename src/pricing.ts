@@ -1,3 +1,5 @@
+import vscode from 'vscode';
+
 /**
  * DeepSeek per-million-token pricing — the single source of truth for both
  * the model-picker hints and the status-bar cost estimate.
@@ -66,7 +68,12 @@ const PEAK_WINDOWS_UTC: readonly (readonly [number, number])[] = [
 const PRO_BILLS_AS_FLASH_FROM_MS = Date.UTC(2026, 8, 14, 4);
 
 /** Peak schedule in prose, for tooltips and settings copy. */
-export const PEAK_WINDOW_DESCRIPTION = '01:00-04:00 and 06:00-10:00 UTC Mon-Fri';
+export const PEAK_WINDOW_DESCRIPTION = vscode.l10n.t('01:00-04:00 and 06:00-10:00 UTC Mon-Fri');
+
+/** Display name for a rate tier in tooltips and picker hints. */
+export function rateTierLabel(tier: RateTier): string {
+  return tier === 'peak' ? vscode.l10n.t('peak') : vscode.l10n.t('off-peak');
+}
 
 export function getRateTier(at: Date = new Date()): RateTier {
   const day = at.getUTCDay();
@@ -118,7 +125,12 @@ function formatRate(n: number): string {
  */
 export function priceHint(model: PriceableModel, at: Date = new Date()): string {
   const rates = getRates(model, 'USD', at);
-  return `$${formatRate(rates.cacheMiss)}/$${formatRate(rates.output)} per Mtok in/out · ${getRateTier(at)}`;
+  return vscode.l10n.t(
+    '{0}/{1} per Mtok in/out · {2}',
+    `$${formatRate(rates.cacheMiss)}`,
+    `$${formatRate(rates.output)}`,
+    rateTierLabel(getRateTier(at)),
+  );
 }
 
 /**

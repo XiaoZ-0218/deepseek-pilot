@@ -42,7 +42,14 @@ export function toChatInfo(
   const rate = priceHint(model.family, now);
 
   const tooltip = hasKey
-    ? `${model.description}\n\nContext: ${formatTokens(model.maxInputTokens)} in / ${formatTokens(model.maxOutputTokens)} out\nRate: ${rate} (peak ${PEAK_WINDOW_DESCRIPTION}; off-peak is half price)`
+    ? vscode.l10n.t(
+        '{0}\n\nContext: {1} in / {2} out\nRate: {3} (peak {4}; off-peak is half price)',
+        vscode.l10n.t(model.description),
+        formatTokens(model.maxInputTokens),
+        formatTokens(model.maxOutputTokens),
+        rate,
+        PEAK_WINDOW_DESCRIPTION,
+      )
     : API_KEY_REQUIRED_DETAIL;
 
   const statusIcon = !hasKey

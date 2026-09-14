@@ -5,6 +5,7 @@ import {
   PEAK_WINDOW_DESCRIPTION,
   getRateTier,
   getRates,
+  rateTierLabel,
   resolveFamily,
   type PricingCurrency,
 } from '../pricing';
@@ -302,15 +303,21 @@ export class BalanceTracker {
     const ctxSnap = this.contextTracker?.snapshot();
     if (ctxSnap && ctxSnap.turn) {
       const turn = ctxSnap.turn;
-      md.appendMarkdown(`**Model** &nbsp; \`${turn.modelName}\`\n\n`);
+      md.appendMarkdown(vscode.l10n.t('**Model** &nbsp; `{0}`', turn.modelName) + '\n\n');
       md.appendMarkdown(
-        `**Last turn** &nbsp; ${turn.promptTokens.toLocaleString()} / ${turn.maxInputTokens.toLocaleString()} prompt tokens (**${ctxSnap.pctUsed.toFixed(1)}%**) · ${ctxSnap.cacheHitPct.toFixed(0)}% cached\n\n`,
+        vscode.l10n.t(
+          '**Last turn** &nbsp; {0} / {1} prompt tokens (**{2}%**) · {3}% cached',
+          turn.promptTokens.toLocaleString(),
+          turn.maxInputTokens.toLocaleString(),
+          ctxSnap.pctUsed.toFixed(1),
+          ctxSnap.cacheHitPct.toFixed(0),
+        ) + '\n\n',
       );
       md.appendMarkdown(`**${ctxSnap.headline}** — ${ctxSnap.advice}\n\n`);
       md.appendMarkdown(
         `${kvCachePrimerMarkdown()}\n\n` +
-          '[$(info) Compaction details](command:deepseek-pilot.showContextWindow) &nbsp; ' +
-          '[$(gear) Thresholds](command:workbench.action.openSettings?%22deepseek-pilot.contextWarnThreshold%22)\n\n',
+          `[$(info) ${vscode.l10n.t('Compaction details')}](command:deepseek-pilot.showContextWindow) &nbsp; ` +
+          `[$(gear) ${vscode.l10n.t('Thresholds')}](command:workbench.action.openSettings?%22deepseek-pilot.contextWarnThreshold%22)\n\n`,
       );
       md.appendMarkdown('---\n\n');
     }
@@ -321,27 +328,44 @@ export class BalanceTracker {
         ? (this.session.cacheHitTokens / this.session.promptTokens) * 100
         : 0;
     md.appendMarkdown(
-      `**Rate** &nbsp; \`${getRateTier()}\` &nbsp; _(peak ${PEAK_WINDOW_DESCRIPTION}; off-peak is half price)_\n\n`,
+      vscode.l10n.t(
+        '**Rate** &nbsp; `{0}` &nbsp; _(peak {1}; off-peak is half price)_',
+        rateTierLabel(getRateTier()),
+        PEAK_WINDOW_DESCRIPTION,
+      ) + '\n\n',
     );
-    md.appendMarkdown(`**Session** &nbsp; \`${this.session.requestCount} requests\`\n\n`);
     md.appendMarkdown(
-      `- Prompt tokens: ${this.session.promptTokens.toLocaleString()} ` +
-        `(${this.session.cacheHitTokens.toLocaleString()} cache hit, ${this.session.cacheMissTokens.toLocaleString()} miss · ${cacheHitPct.toFixed(0)}% hit)\n`,
+      vscode.l10n.t('**Session** &nbsp; `{0} requests`', this.session.requestCount) + '\n\n',
     );
     md.appendMarkdown(
-      `- Completion tokens: ${this.session.completionTokens.toLocaleString()} ` +
-        `(${this.session.reasoningTokens.toLocaleString()} reasoning)\n`,
+      vscode.l10n.t(
+        '- Prompt tokens: {0} ({1} cache hit, {2} miss · {3}% hit)',
+        this.session.promptTokens.toLocaleString(),
+        this.session.cacheHitTokens.toLocaleString(),
+        this.session.cacheMissTokens.toLocaleString(),
+        cacheHitPct.toFixed(0),
+      ) + '\n',
     );
-    md.appendMarkdown(`- Estimated cost: ${sym}${this.session.estimatedCost.toFixed(4)}\n\n`);
+    md.appendMarkdown(
+      vscode.l10n.t(
+        '- Completion tokens: {0} ({1} reasoning)',
+        this.session.completionTokens.toLocaleString(),
+        this.session.reasoningTokens.toLocaleString(),
+      ) + '\n',
+    );
+    md.appendMarkdown(
+      vscode.l10n.t('- Estimated cost: {0}{1}', sym, this.session.estimatedCost.toFixed(4)) +
+        '\n\n',
+    );
 
-    md.appendMarkdown(`[$(refresh) Clear session](command:deepseek-pilot.clearSession)\n\n`);
+    md.appendMarkdown(`[$(refresh) ${vscode.l10n.t('Clear session')}](command:deepseek-pilot.clearSession)\n\n`);
 
     md.appendMarkdown('---\n\n');
 
     md.appendMarkdown(
       this.balance
-        ? '**Balance** &nbsp; [$(refresh) refresh](command:deepseek-pilot.refreshBalance)\n\n'
-        : '**Balance** &nbsp; [$(refresh) click to fetch](command:deepseek-pilot.refreshBalance)\n\n',
+        ? vscode.l10n.t('**Balance** &nbsp; [$(refresh) refresh](command:deepseek-pilot.refreshBalance)') + '\n\n'
+        : vscode.l10n.t('**Balance** &nbsp; [$(refresh) click to fetch](command:deepseek-pilot.refreshBalance)') + '\n\n',
     );
     if (this.balance) {
       const bsym = currencySymbol(this.balance.currency);
@@ -350,23 +374,32 @@ export class BalanceTracker {
       );
       if (this.balance.totalGranted > 0 || this.balance.totalToppedUp > 0) {
         md.appendMarkdown(
-          `_${bsym}${this.balance.totalGranted.toFixed(2)} granted + ${bsym}${this.balance.totalToppedUp.toFixed(2)} topped up_\n\n`,
+          vscode.l10n.t(
+            '_{0}{1} granted + {2}{3} topped up_',
+            bsym,
+            this.balance.totalGranted.toFixed(2),
+            bsym,
+            this.balance.totalToppedUp.toFixed(2),
+          ) + '\n\n',
         );
       }
       const accountCcy = this.balance.currency;
       if (accountCcy !== 'USD' && accountCcy !== 'CNY') {
         md.appendMarkdown(
-          `_$(warning) Cost estimation uses USD pricing — actual billing is in ${accountCcy}_\n\n`,
+          vscode.l10n.t(
+            '_$(warning) Cost estimation uses USD pricing — actual billing is in {0}_',
+            accountCcy,
+          ) + '\n\n',
         );
       }
     }
 
     md.appendMarkdown('---\n\n');
     md.appendMarkdown(
-      `**Reasoning effort** &nbsp; \`${getReasoningEffort()}\` &nbsp; ` +
-        '[$(gear) configure](command:workbench.action.openSettings?%22deepseek-pilot.reasoningEffort%22)\n\n',
+      vscode.l10n.t('**Reasoning effort** &nbsp; `{0}`', getReasoningEffort()) +
+        ` &nbsp; [$(gear) ${vscode.l10n.t('configure')}](command:workbench.action.openSettings?%22deepseek-pilot.reasoningEffort%22)\n\n`,
     );
-    md.appendMarkdown('[View full log](command:deepseek-pilot.showLogs)');
+    md.appendMarkdown(`[${vscode.l10n.t('View full log')}](command:deepseek-pilot.showLogs)`);
 
     return md;
   }
